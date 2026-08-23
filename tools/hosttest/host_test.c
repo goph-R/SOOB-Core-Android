@@ -54,6 +54,18 @@ static struct {
     char *savedOpts;
 } S;
 
+/* Argument bundles captured from the last call of each drawing binding, so the
+   option-table parsing ported from script.h can be checked exactly. */
+static struct {
+    double region[25];
+    double text[8];
+    double quad[8];
+    double ellipse[12];
+    double blurW, blurA;
+    char textFont[64];
+    double imeX, imeY, imeW, imeH;
+} C;
+
 /* ---- the region table, so regionSize()/drawRegion have real answers ---- */
 #define MAX_REGIONS 512
 static struct {
@@ -189,20 +201,29 @@ static void hostVoid(jmethodID m, va_list ap) {
         jstring n = va_arg(ap, jstring);
         S.drawRegion++;
         snprintf(S.lastRegion, sizeof S.lastRegion, "%s", cstr(n));
+        memcpy(C.region, g_args, sizeof C.region);
         if (findRegion(cstr(n)) < 0) {
             fprintf(stderr, "  ! drawRegion of unregistered region '%s'\n", cstr(n));
         }
     } else if (is(m, "drawText")) {
         jstring t = va_arg(ap, jstring);
+        jstring f = va_arg(ap, jstring);
         S.drawText++;
         snprintf(S.lastText, sizeof S.lastText, "%s", cstr(t));
+        snprintf(C.textFont, sizeof C.textFont, "%s", cstr(f));
+        memcpy(C.text, g_args, sizeof C.text);
     } else if (is(m, "drawQuad")) {
         S.drawQuad++;
+        memcpy(C.quad, g_args, sizeof C.quad);
     } else if (is(m, "drawEllipse")) {
         S.drawEllipse++;
+        memcpy(C.ellipse, g_args, sizeof C.ellipse);
     } else if (is(m, "drawBg")) {
         S.drawBg++;
     } else if (is(m, "drawBlur")) {
+        (void)va_arg(ap, jstring);          /* region name */
+        C.blurW = va_arg(ap, double);
+        C.blurA = va_arg(ap, double);
         S.drawBlur++;
     } else if (is(m, "soundPlay")) {
         S.soundPlay++;
@@ -221,6 +242,10 @@ static void hostVoid(jmethodID m, va_list ap) {
     } else if (is(m, "requestQuit")) {
         S.quit++;
     } else if (is(m, "imeShow")) {
+        C.imeX = va_arg(ap, double);
+        C.imeY = va_arg(ap, double);
+        C.imeW = va_arg(ap, double);
+        C.imeH = va_arg(ap, double);
         S.imeShow++;
     } else if (is(m, "imeHide")) {
         S.imeHide++;
@@ -393,6 +418,89 @@ static void check(int cond, const char *what) {
     if (!cond) fails++;
 }
 
+static void checkNum(double got, double want, const char *what) {
+    int ok = (got > want - 1e-9) && (got < want + 1e-9);
+    printf("%s %s (got %g, want %g)\n", ok ? "ok  " : "FAIL", what, got, want);
+    if (!ok) fails++;
+}
+
+/* Every option-carrying binding called once with a fully populated table, so
+   the argument parsing ported from script.h's scr* wrappers can be checked
+   value by value — the part of the bridge most likely to drift silently. */
+static void checkBindingMarshalling(JNIEnv *env) {
+    printf("\n-- binding marshalling --\n");
+    Java_info_dynart_soob_Lua_doString(env, 0, STR(
+        "function onRender()\n"
+        "  drawRegion('logo', 10, 20, { align = ALIGN_RIGHT + ALIGN_BOTTOM, flip = FLIP_H,\n"
+        "      fillX = 0.5, fillY = 0.25, scaleX = 2, scaleY = 3, rotation = 1.5,\n"
+        "      color = { 0.1, 0.2, 0.3, 0.4 }, srcX = 8, srcW = 16, dstW = 100 })\n"
+        "  drawText('hi', 1, 2, { scale = 3, align = ALIGN_CENTER + ALIGN_MIDDLE,\n"
+        "      font = 'large', color = { 0.5, 0.6, 0.7 }, alpha = 0.25 })\n"
+        "  drawQuad(1, 2, 3, 4, { color = { 1, 0, 0 }, alpha = 0.5 })\n"
+        "  drawEllipse(5, 6, 7, 8, { start = 0.25, finish = 0.75, segments = 32,\n"
+        "      thickness = 2.5, color = { 0, 1, 0 }, alpha = 0.5 })\n"
+        "  drawBlur('image_1a', { width = 32, alpha = 0.3 })\n"
+        "  imeShow(11, 22, 33, 44)\n"
+        "end\n"));
+    Java_info_dynart_soob_Lua_render(env, 0);
+
+    checkNum(C.region[0], 10, "drawRegion x");
+    checkNum(C.region[2], 4 + 32, "drawRegion align (RIGHT|BOTTOM)");
+    checkNum(C.region[3], 1, "drawRegion flip (FLIP_H)");
+    checkNum(C.region[4], 0.5, "drawRegion fillX");
+    checkNum(C.region[5], 0.25, "drawRegion fillY");
+    checkNum(C.region[6], 2, "drawRegion scaleX");
+    checkNum(C.region[7], 3, "drawRegion scaleY");
+    checkNum(C.region[8], 1.5, "drawRegion rotation");
+    checkNum(C.region[9], 0.1, "drawRegion color r");
+    checkNum(C.region[12], 0.4, "drawRegion color a");
+    checkNum(C.region[13], 1, "drawRegion hasSrcX");
+    checkNum(C.region[14], 8, "drawRegion srcX");
+    checkNum(C.region[15], 0, "drawRegion hasSrcY (absent)");
+    checkNum(C.region[17], 1, "drawRegion hasSrcW");
+    checkNum(C.region[18], 16, "drawRegion srcW");
+    checkNum(C.region[21], 1, "drawRegion hasDstW");
+    checkNum(C.region[22], 100, "drawRegion dstW");
+    checkNum(C.region[23], 0, "drawRegion hasDstH (absent)");
+
+    checkNum(C.text[2], 3, "drawText scale");
+    checkNum(C.text[3], 2 + 16, "drawText align (CENTER|MIDDLE)");
+    checkNum(C.text[6], 0.7, "drawText color b");
+    checkNum(C.text[7], 0.25, "drawText alpha overrides color a");
+    check(strcmp(C.textFont, "large") == 0, "drawText font name");
+
+    checkNum(C.quad[3], 4, "drawQuad h");
+    checkNum(C.quad[4], 1, "drawQuad color r");
+    checkNum(C.quad[7], 0.5, "drawQuad alpha");
+
+    checkNum(C.ellipse[4], 0.25, "drawEllipse start");
+    checkNum(C.ellipse[5], 0.75, "drawEllipse finish");
+    checkNum(C.ellipse[6], 32, "drawEllipse segments");
+    checkNum(C.ellipse[7], 2.5, "drawEllipse thickness");
+    checkNum(C.ellipse[9], 1, "drawEllipse color g");
+
+    checkNum(C.blurW, 32, "drawBlur width");
+    checkNum(C.blurA, 0.3, "drawBlur alpha");
+    checkNum(C.imeX, 11, "imeShow x");
+    checkNum(C.imeH, 44, "imeShow h");
+
+    /* Defaults: the positional form and a bare call. */
+    Java_info_dynart_soob_Lua_doString(env, 0, STR(
+        "function onRender()\n"
+        "  drawRegion('logo', 1, 2)\n"
+        "  drawEllipse(0, 0, 5, 5)\n"
+        "  drawBlur('image_1a')\n"
+        "end\n"));
+    Java_info_dynart_soob_Lua_render(env, 0);
+    checkNum(C.region[4], 1, "drawRegion fillX defaults to 1");
+    checkNum(C.region[6], 1, "drawRegion scale defaults to 1");
+    checkNum(C.region[12], 1, "drawRegion alpha defaults to 1");
+    checkNum(C.ellipse[6], 64, "drawEllipse segments defaults to 64");
+    checkNum(C.ellipse[7], 2, "drawEllipse thickness defaults to 2");
+    checkNum(C.blurW, 16, "drawBlur width defaults to 16");
+    checkNum(C.blurA, 0.6, "drawBlur alpha defaults to 0.6");
+}
+
 int main(int argc, char **argv) {
     if (argc > 1) g_gameDir = argv[1];
     printf("game bundle: %s\n\n", g_gameDir);
@@ -436,6 +544,8 @@ int main(int argc, char **argv) {
         "optLoad() local t = optGet('host_test') "
         "assert(t and t.level == 3 and t.name == 'abc' and t.on == true, 'opts round-trip')"));
     check(1, "optLoad round-tripped the table");
+
+    checkBindingMarshalling(&g_env);
 
     printf("\nassets:  %d textures, %d regions, %d fonts, %d sounds, %d music\n",
            S.regTextures, S.regRegions, S.regFonts, S.regSounds, S.regMusic);
