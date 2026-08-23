@@ -65,6 +65,34 @@ keyPassword=...
 
 Without that file the release build still assembles, unsigned.
 
+## Testing without a device
+
+The Kotlin half needs a phone, but the C half — the Lua state, the sandbox, the
+asset searcher, the `assets.lua` walk, the argument marshalling, the hook
+dispatch — is plain C behind the JNI function table, so it runs on the desktop:
+
+```sh
+cd tools/hosttest
+./build.sh && ./host_test.exe ../../../Find5
+```
+
+`host_test.c` supplies a stub JNI table and a C mirror of `Host`, then boots the
+real game bundle through the **unmodified** `bridge_jni.c` and asserts on what
+the Lua did (assets registered, `require` resolved, the first scene drew, the
+options chunk round-tripped). It builds with the portable MinGW that SOOB-Core
+vendors for the Win10 build, or any `cc`.
+
+```
+ok   newState
+I/SOOB: assets: 6 sound(s), 1 music, 8 texture(s), 2 font(s), 34 region(s)
+ok   run main.lua
+ok   require() resolved modules through the asset searcher
+ok   the first scene draws
+draws:   region=22 text=4 quad=0 ellipse=0 bg=4 blur=0
+```
+
+There are also JVM unit tests for BMFont: `./gradlew :soob-player:test`.
+
 ## Adding another game
 
 Nothing in `soob-player` knows what Find5 is — the game contract is the Lua
@@ -109,6 +137,14 @@ Either way the library is consumed, never forked.
 
 ## Status
 
-M0–M4 written and building (debug + R8 release); **not yet run on a device** —
-first-boot verification is the immediate next step. See the plan in
+M0–M4 written and building: debug APK, R8 release APK, AAB, arm64 libs
+16 KB-aligned.
+
+Verified: the C bridge boots Find5's real bundle in the host harness (assets,
+`require`, hooks, draw calls, options round-trip); the 14 JNI entry points in
+`libsoob.so` match `Lua.kt` and all 34 host descriptors match the compiled
+`Host` class; BMFont unit tests pass against Find5's real `.fnt`.
+
+**Not yet run on a device** — rendering, audio, touch and the IME are unproven,
+so first boot on hardware is the next step. See the plan in
 [`SOOB-Core/SOOB-Core-Android.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Core-Android.md).

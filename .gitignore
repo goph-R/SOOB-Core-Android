@@ -45,3 +45,8 @@ tools/hosttest/host_test.exe
 tools/hosttest/host_test
 
 .DS_Store
+
+# host harness build output
+tools/hosttest/.jni/
+tools/hosttest/host_test.exe
+tools/hosttest/host_test
