@@ -150,7 +150,9 @@ checks on the binding argument marshalling; the 14 JNI entry points in
 `libsoob.so` match `Lua.kt` and all 34 host descriptors match the compiled
 `Host` class; BMFont unit tests pass against Find5's real `.fnt`.
 
-Runs on hardware: first boot verified on a Redmi (Android 13, armeabi-v7a) —
-title screen renders, touch reaches the Lua hooks, Start game runs the level.
-Audio and the IME bridge still want a hands-on pass. See the plan in
+Runs on hardware — verified end to end on a Redmi (Android 13, armeabi-v7a):
+the title screen renders, touch reaches the Lua hooks, a level plays, and audio
+and the soft-keyboard bridge behave. M0–M5 done; what remains is the real
+launcher icon, the store listing, and whatever a second game asks for. See the
+plan in
 [`SOOB-Core/SOOB-Core-Android.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Core-Android.md).
