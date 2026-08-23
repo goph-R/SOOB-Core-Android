@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Gabor Laszlo
+Copyright (c) 2026 Gábor László
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,16 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-NOTE: The MIT license above applies to the Find5 engine source code
-(the C/C++ headers, main.cpp, Lua scripts, build scripts, and CMake files
-authored for this project).
-
-Third-party libraries under `vendor/` and `vendor_win10/` retain their own
-licenses (LGPL for SDL 1.2 and OpenAL Soft; MIT for Lua 5.1; Public Domain
-for stb_image and stb_vorbis). See the "Code" section of README.md.
-
-Art assets under `assets/` (textures, models, music, sounds) carry their
-own terms — see the "Assets" section of README.md.
