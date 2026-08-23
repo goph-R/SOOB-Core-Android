@@ -141,7 +141,8 @@ M0–M4 written and building: debug APK, R8 release APK, AAB, arm64 libs
 16 KB-aligned.
 
 Verified: the C bridge boots Find5's real bundle in the host harness (assets,
-`require`, hooks, draw calls, options round-trip); the 14 JNI entry points in
+`require`, hooks, draw calls, options round-trip) and passes 42 value-by-value
+checks on the binding argument marshalling; the 14 JNI entry points in
 `libsoob.so` match `Lua.kt` and all 34 host descriptors match the compiled
 `Host` class; BMFont unit tests pass against Find5's real `.fnt`.
 
