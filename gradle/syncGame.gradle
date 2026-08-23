@@ -1,0 +1,34 @@
+// syncGame — copy a game bundle into this app module's assets, the Gradle twin
+// of SOOB-Core-Web's scripts/sync-game.mjs.
+//
+// The game repo stays the single source of truth: this only copies, never
+// forks. Applied by an app module that sets `soobGame` to the bundle root:
+//
+//     ext.soobGame = file("$rootDir/../Find5")
+//     apply from: rootProject.file('gradle/syncGame.gradle')
+
+def bundle = project.ext.soobGame
+def dest = layout.projectDirectory.dir('src/main/assets/game')
+
+tasks.register('syncGame', Sync) {
+    description = 'Copy the game bundle (scripts, assets, assets.lua) into src/main/assets/game.'
+    group = 'build'
+
+    doFirst {
+        if (!bundle.exists()) {
+            throw new GradleException(
+                "syncGame: game bundle not found at ${bundle}.\n" +
+                "The game repo must be checked out as a sibling of this repo.")
+        }
+    }
+
+    from(bundle) {
+        include 'scripts/**'
+        include 'assets/**'
+        include 'assets.lua'
+        include 'config.lua'
+    }
+    into dest
+}
+
+tasks.named('preBuild') { dependsOn 'syncGame' }

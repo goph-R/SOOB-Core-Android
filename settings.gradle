@@ -1,0 +1,21 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'SOOB-Core-Android'
+
+// soob-player is the reusable library (host + Lua/NDK bridge); app is the thin
+// per-game module. A second game adds another app module here, or consumes the
+// library from its own repo with includeBuild '../SOOB-Core-Android'.
+include ':soob-player', ':app'
