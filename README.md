@@ -158,7 +158,10 @@ checks on the binding argument marshalling; the 14 JNI entry points in
 
 Runs on hardware — verified end to end on a Redmi (Android 13, armeabi-v7a):
 the title screen renders, touch reaches the Lua hooks, a level plays, and audio
-and the soft-keyboard bridge behave. M0–M5 done; what remains is the real
+and the soft-keyboard bridge behave. Identity comes from the bundle: the player
+logs `app: Find5 (id=find5, landscape)` at boot and an option toggle writes
+`<filesDir>/find5.dat` as `return {["sound_on"]=false,}` — the desktop format,
+under the name app.lua gave it. M0–M5 done; what remains is the real
 launcher icon, the store listing, and whatever a second game asks for. See the
 plan in
 [`SOOB-Core/SOOB-Core-Android.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Core-Android.md).
