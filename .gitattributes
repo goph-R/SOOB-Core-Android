@@ -1,0 +1,27 @@
+# Windows batch and cmd files MUST have CRLF line endings. cmd.exe parses
+# LF-only batch files incorrectly, producing "'ocal' is not recognized"-
+# style errors where the first characters of each line are eaten. core.autocrlf
+# alone is not enough under `input` mode, so pin the ending explicitly.
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+
+# Shell scripts — always LF.
+*.sh       text eol=lf
+
+# Binary-ish assets: don't let git touch them. Wavefront .obj is
+# deliberately omitted — it's text and we want normal diffs.
+*.png      binary
+*.iqm      binary
+*.blend    binary
+*.blend1   binary
+*.dll      binary
+*.exe      binary
+*.fbx      binary
+*.zip      binary
+*.wav      binary
+*.ogg      binary
+*.m4a      binary
+*.jar      binary
+*.so       binary
+*.apk      binary
+*.aab      binary

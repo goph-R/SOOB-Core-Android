@@ -26,7 +26,11 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
         const val MAX_DT = 0.1                     // same clamp as the web loop
         const val OFFSCREEN = -1e5f                // parks the virtual cursor
         const val BACK_QUIT_NANOS = 2_000_000_000L // double-press window to quit
+        const val LOAD_BUDGET_NANOS = 8_000_000L   // decode work per loading frame
     }
+
+    /** Boot is sliced across frames so the loading screen can animate. */
+    private enum class Phase { START, LOADING, FINISH, RUNNING, FAILED }
 
     private val renderer = SoobRenderer()
 
@@ -35,6 +39,7 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
     var booted = false
         private set
 
+    private var phase = Phase.START
     private var lastNanos = 0L
     private var lastX = 0f
     private var lastY = 0f
@@ -63,8 +68,6 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
             if (booted) {
                 Log.i(TAG, "GL context recreated — reloading textures")
                 Assets.loadGraphics()
-            } else {
-                boot()
             }
             lastNanos = 0L
         }
@@ -74,7 +77,11 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
         }
 
         override fun onDrawFrame(gl: GL10?) {
-            if (!booted) return
+            if (phase != Phase.RUNNING) {
+                bootStep()
+                drawBootScreen()
+                return
+            }
             val now = System.nanoTime()
             val dt = if (lastNanos == 0L) 0.0 else minOf((now - lastNanos) / 1e9, MAX_DT)
             lastNanos = now
@@ -87,28 +94,77 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
     }
 
     /**
-     * Boot sequence, mirroring the desktop host (and `src/game/main.ts`):
-     * stand up the VM, run `assets.lua` to fill the registries, load every
-     * texture/font/sound, then run `main.lua` and fire `onStart`.
+     * Boot, one slice per frame, mirroring the desktop host (and the web
+     * host's `src/game/main.ts`): stand up the VM, run `assets.lua` to fill
+     * the registries, decode every texture and font, then run `main.lua` and
+     * fire `onStart`. Slicing keeps the loading screen responsive; the desktop
+     * build does the same work in one synchronous block.
      */
-    private fun boot() {
-        if (!Lua.newState()) {
-            Log.e(TAG, "failed to create the Lua state")
-            return
+    private fun bootStep() {
+        when (phase) {
+            Phase.START -> {
+                if (!Lua.newState()) {
+                    Log.e(TAG, "failed to create the Lua state")
+                    phase = Phase.FAILED
+                    return
+                }
+                Lua.setPlatform("android")
+                if (!Lua.loadAssets("assets.lua")) {
+                    Log.e(TAG, "assets.lua failed — is the game bundle synced into assets/game/?")
+                    phase = Phase.FAILED
+                    return
+                }
+                Assets.beginLoad()
+                Assets.loadAudio()
+                phase = Phase.LOADING
+            }
+
+            Phase.LOADING -> {
+                val deadline = System.nanoTime() + LOAD_BUDGET_NANOS
+                var more = true
+                while (more && System.nanoTime() < deadline) more = Assets.loadStep()
+                if (!more) phase = Phase.FINISH
+            }
+
+            Phase.FINISH -> {
+                if (!Lua.doAsset("scripts/main.lua")) {
+                    Log.e(TAG, "scripts/main.lua failed")
+                    phase = Phase.FAILED
+                    return
+                }
+                Lua.callHook0("onStart")
+                booted = true
+                phase = Phase.RUNNING
+                lastNanos = 0L
+            }
+
+            else -> Unit
         }
-        Lua.setPlatform("android")
-        if (!Lua.loadAssets("assets.lua")) {
-            Log.e(TAG, "assets.lua failed — is the game bundle synced into assets/game/?")
-            return
+    }
+
+    /**
+     * The loading screen: a progress bar drawn straight through the batcher,
+     * before any game asset exists. Red on failure — the reason is in Logcat.
+     */
+    private fun drawBootScreen() {
+        Gfx.beginFrame()
+        val vw = Gfx.viewW()
+        val w = vw * 0.4f
+        val h = 6f
+        val x = -w / 2f
+        val y = 60f
+        val total = Assets.loadTotal()
+        val p = if (phase == Phase.FINISH) 1f
+        else if (total > 0) Assets.loadDone().toFloat() / total
+        else 0f
+
+        if (phase == Phase.FAILED) {
+            Gfx.drawSolidQuad(x, y, w, h, 0.8f, 0.2f, 0.2f, 1f)
+        } else {
+            Gfx.drawSolidQuad(x, y, w, h, 1f, 1f, 1f, 0.15f)
+            if (p > 0f) Gfx.drawSolidQuad(x, y, w * p, h, 0.95f, 0.91f, 0.86f, 0.9f)
         }
-        Assets.loadGraphics()
-        Assets.loadAudio()
-        if (!Lua.doAsset("scripts/main.lua")) {
-            Log.e(TAG, "scripts/main.lua failed")
-            return
-        }
-        Lua.callHook0("onStart")
-        booted = true
+        Gfx.flush()
     }
 
     // ---- input (UI thread → GL thread) ----
@@ -121,6 +177,20 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
     private fun toVirtualY(ey: Float): Float =
         ((ey - Gfx.viewportTop()) / Gfx.viewportH() - 0.5f) * Gfx.viewH()
 
+    /**
+     * Which SOOB button a press maps to: 1 = left, 2 = middle, 3 = right.
+     * Touch is always 1; a real mouse (Chromebook, DeX, a tablet with a
+     * trackpad) reports its own button state.
+     */
+    private fun buttonOf(event: MotionEvent): Int {
+        if (event.getToolType(0) != MotionEvent.TOOL_TYPE_MOUSE) return 1
+        return when {
+            event.buttonState and MotionEvent.BUTTON_TERTIARY != 0 -> 2
+            event.buttonState and MotionEvent.BUTTON_SECONDARY != 0 -> 3
+            else -> 1
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (width == 0 || height == 0) return true
         val x = toVirtualX(event.x)
@@ -129,10 +199,11 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = x
                 lastY = y
+                val b = buttonOf(event)
                 queueEvent {
                     Input.setMouse(x, y)
-                    Input.pressButton(1)
-                    Lua.mouseDown(x.toDouble(), y.toDouble(), 1)
+                    Input.pressButton(b)
+                    Lua.mouseDown(x.toDouble(), y.toDouble(), b)
                 }
             }
             MotionEvent.ACTION_MOVE -> {
@@ -146,10 +217,11 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val b = buttonOf(event)
                 queueEvent {
                     Input.setMouse(x, y)
-                    Input.releaseButton(1)
-                    Lua.mouseUp(x.toDouble(), y.toDouble(), 1)
+                    Input.releaseButton(b)
+                    Lua.mouseUp(x.toDouble(), y.toDouble(), b)
                     // Touch has no pointer-leave: park the cursor off-canvas so
                     // a tapped widget doesn't stay lit (same as the web host).
                     Input.setMouse(OFFSCREEN, OFFSCREEN)
@@ -158,6 +230,34 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
             }
         }
         return true
+    }
+
+    /** Mouse wheel — buttons 4 (up) and 5 (down), same as the desktop host. */
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL && width != 0 && height != 0) {
+            val x = toVirtualX(event.x)
+            val y = toVirtualY(event.y)
+            val v = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            if (v != 0f) {
+                val b = if (v > 0f) 4 else 5
+                queueEvent { Lua.mouseDown(x.toDouble(), y.toDouble(), b) }
+                return true
+            }
+        }
+        if (event.actionMasked == MotionEvent.ACTION_HOVER_MOVE && width != 0 && height != 0) {
+            val x = toVirtualX(event.x)
+            val y = toVirtualY(event.y)
+            val dx = x - lastX
+            val dy = y - lastY
+            lastX = x
+            lastY = y
+            queueEvent {
+                Input.setMouse(x, y)
+                Lua.mouseMove(x.toDouble(), y.toDouble(), dx.toDouble(), dy.toDouble())
+            }
+            return true
+        }
+        return super.onGenericMotionEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

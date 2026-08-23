@@ -24,4 +24,8 @@ add_library(soob SHARED ${LUA_SOURCES} bridge_jni.c)
 target_include_directories(soob PRIVATE ${LUA_DIR})
 target_compile_definitions(soob PRIVATE LUA_USE_POSIX LUA_ANSI=0 NDEBUG)
 target_compile_options(soob PRIVATE -O2 -fvisibility=hidden -Wall)
+
+# The vendored Lua is upstream C89 and trips -Wall on its own idioms; only our
+# bridge is held to the warning level.
+set_source_files_properties(${LUA_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 target_link_libraries(soob log)

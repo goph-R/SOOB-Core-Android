@@ -1,0 +1,99 @@
+# SOOB-Core-Android
+
+Android player for **2D SOOB-Core games** — [Find5](https://github.com/goph-R/Find5)
+first. It reimplements SOOB-Core's narrow C binding surface (the 25 bindings +
+lifecycle hooks documented in
+[`SOOB-Lua.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Lua.md)) in
+Kotlin against Android APIs, while the game's Lua scripts, the
+`engine.scene/widget/animation/transition` modules, and `assets.lua` run
+**unchanged**. Lua 5.1 itself is the vendored `lua-5.1.5` compiled by the NDK,
+for exact behavioural parity with the desktop and web builds.
+
+It is the sibling of [`SOOB-Core-Web`](https://github.com/goph-R/SOOB-Core-Web):
+same contract, same host structure, different platform. 3D (SOOB-Engine) is out
+of scope — this is the 2D core only.
+
+## Layout
+
+```
+soob-player/     the reusable library — everything that isn't game identity
+  cpp/           bridge_jni.c   SOOB-Core-Web's bridge.c with JNI host imports
+                 CMakeLists.txt lua-5.1.5 (from ../SOOB-Core) -> libsoob.so
+  Renderer.kt    GLES2 sprite batcher (the WebGL1 shaders, verbatim)
+  BmFont.kt      AngelCode .fnt parsing, measuring, drawing
+  Assets.kt      registries + AssetManager decode/upload, sliced per frame
+  Audio.kt       SoundPool one-shots + dual-MediaPlayer music crossfade
+  Input.kt       held keys / pointer state, Android key codes -> SDL names
+  Ime.kt         hidden-EditText soft-keyboard bridge (imeShow / imeHide)
+  GameView.kt    GLSurfaceView, the frame loop, touch/key marshalling
+  SoobActivity.kt fullscreen/lifecycle/back-button host activity
+  Host.kt        the object bridge_jni.c calls (the __SOOB twin)
+  Lua.kt         the native entry points
+
+app/             the thin Find5 module: applicationId, icon, versionCode,
+                 a 3-line SoobActivity subclass, and syncGame's output
+gradle/
+  syncGame.gradle  copies a game bundle into an app module's assets
+```
+
+`app/src/main/assets/game/` is generated, not committed.
+
+## Build
+
+Needs [`SOOB-Core`](https://github.com/goph-R/SOOB-Core) (for the vendored Lua
+sources) and [`Find5`](https://github.com/goph-R/Find5) (the game bundle) as
+siblings of this repo, plus the Android SDK 36 and NDK 29.
+
+```sh
+./gradlew :app:assembleDebug     # syncGame runs first, automatically
+./gradlew :app:installDebug      # to a connected device
+adb logcat -s SOOB               # print(), engine messages, load errors
+```
+
+## Adding another game
+
+Nothing in `soob-player` knows what Find5 is — the game contract is the Lua
+bundle. A second game is either another module beside `app/`:
+
+```groovy
+// app-mygame/build.gradle
+ext.soobGame = file("$rootDir/../MyGame")
+android { defaultConfig { applicationId 'info.dynart.mygame' } }
+dependencies { implementation project(':soob-player') }
+apply from: rootProject.file('gradle/syncGame.gradle')
+```
+
+```kotlin
+class MyGameActivity : SoobActivity() { override val gameId = "mygame" }
+```
+
+…or the same module living in the game's own repo, pulling the player in with
+`includeBuild '../SOOB-Core-Android'` — the way CoolFox consumes LisaEngine.
+Either way the library is consumed, never forked.
+
+## Notes for the port
+
+- **Threading.** The Lua VM and every binding run on the GLSurfaceView render
+  thread. Touch/key/IME events arrive on the UI thread and are marshalled with
+  `queueEvent`, so they land between frames — the native poll-then-update order.
+- **Scripts are not files.** Android assets have no `fopen`, so instead of
+  `luaL_loadfile` + `package.path` the bridge installs a `package.loaders`
+  searcher that reads through `AssetManager` (`require "engine.scene"` →
+  `scripts/engine/scene.lua`).
+- **Premultiplied alpha.** Textures are decoded with `inPremultiplied = false`
+  and uploaded from the raw buffer; the batcher blends `SRC_ALPHA,
+  ONE_MINUS_SRC_ALPHA`. Uploading a premultiplied bitmap gives every sprite
+  dark edges.
+- **`noCompress`.** `wav`/`ogg`/`m4a` are stored uncompressed so `SoundPool`
+  and `MediaPlayer` can seek an `AssetFileDescriptor`.
+- **Saves are the desktop format.** `optSave` writes the same `return { … }`
+  chunk to `<filesDir>/<gameId>.dat`, so a save moves between desktop and phone.
+- **`requestQuit` is real here** (unlike on web) and BACK is the desktop
+  Escape: it reaches Lua as `onKeyDown("escape")`, and a second press within
+  two seconds finishes the activity.
+
+## Status
+
+M0–M4 written and building (debug + R8 release); **not yet run on a device** —
+first-boot verification is the immediate next step. See the plan in
+[`SOOB-Core/SOOB-Core-Android.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Core-Android.md).

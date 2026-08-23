@@ -121,50 +121,74 @@ object Assets {
         return if (i < 0) "" else path.substring(0, i + 1)
     }
 
-    /** Total work units for the loading screen. */
-    fun graphicsCount(): Int = textures.size + fonts.size
+    // ---- graphics loading, one job per step ----
+    //
+    // Decoding + uploading runs on the GL thread, so it is sliced into jobs and
+    // pumped one per frame while [GameView] draws the loading screen. The
+    // whole-batch form is used for the context-loss reload, where there is
+    // nothing to show anyway.
+
+    private var jobs: List<() -> Unit> = emptyList()
+    private var jobIndex = 0
+
+    fun beginLoad() {
+        val list = ArrayList<() -> Unit>(textures.size + fonts.size)
+        for (e in textures.values) list.add { loadTexture(e) }
+        for (f in fonts.values) list.add { loadFont(f) }
+        jobs = list
+        jobIndex = 0
+    }
+
+    /** Run one job; returns true while work remains. */
+    fun loadStep(): Boolean {
+        if (jobIndex >= jobs.size) return false
+        jobs[jobIndex++].invoke()
+        return jobIndex < jobs.size
+    }
+
+    fun loadDone(): Int = jobIndex
+
+    fun loadTotal(): Int = jobs.size
 
     /**
-     * Decode + upload every texture and font page. Runs on the GL thread, at
-     * boot and again after an EGL context loss (all previous handles die with
-     * the context, so this is also the reload path).
+     * Decode + upload every texture and font page in one go. Used for the
+     * EGL context-loss reload path: all previous handles die with the context.
      */
-    fun loadGraphics(onProgress: ((Int, Int) -> Unit)? = null) {
-        val total = graphicsCount()
-        var done = 0
+    fun loadGraphics() {
+        beginLoad()
+        @Suppress("ControlFlowWithEmptyBody")
+        while (loadStep());
+    }
 
-        for (e in textures.values) {
-            val bmp = decode(e.path)
-            if (bmp != null) {
-                e.tex = Renderer.makeTexture(bmp)
-                e.w = bmp.width
-                e.h = bmp.height
-                bmp.recycle()
-            } else {
-                e.tex = 0
-                e.w = 0
-                e.h = 0
-            }
-            onProgress?.invoke(++done, total)
+    private fun loadTexture(e: TexEntry) {
+        val bmp = decode(e.path)
+        if (bmp != null) {
+            e.tex = Renderer.makeTexture(bmp)
+            e.w = bmp.width
+            e.h = bmp.height
+            bmp.recycle()
+        } else {
+            e.tex = 0
+            e.w = 0
+            e.h = 0
         }
+    }
 
-        for (f in fonts.values) {
-            val text = bytes(f.path)?.toString(Charsets.UTF_8)
-            if (text != null) {
-                val data = BmFont.parse(text)
-                f.data = data
-                val page = dir(f.path) + data.pageFile
-                val bmp = decode(page)
-                if (bmp != null) {
-                    f.tex = Renderer.makeTexture(bmp)
-                    bmp.recycle()
-                } else {
-                    f.tex = 0
-                }
-            } else {
-                Log.w(TAG, "font skipped: ${f.path}")
-            }
-            onProgress?.invoke(++done, total)
+    private fun loadFont(f: FontEntry) {
+        val text = bytes(f.path)?.toString(Charsets.UTF_8)
+        if (text == null) {
+            Log.w(TAG, "font skipped: ${f.path}")
+            return
+        }
+        val data = BmFont.parse(text)
+        f.data = data
+        val page = dir(f.path) + data.pageFile
+        val bmp = decode(page)
+        if (bmp != null) {
+            f.tex = Renderer.makeTexture(bmp)
+            bmp.recycle()
+        } else {
+            f.tex = 0
         }
     }
 
