@@ -1,6 +1,7 @@
 package info.dynart.soob
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -16,24 +17,15 @@ import java.io.File
  * The player activity — the port of SOOB-Core-Web's `src/host/mobile.ts` plus
  * the boot half of `src/game/main.ts`.
  *
- * A game module subclasses this and overrides [gameId]; everything else (GL
- * surface, Lua VM, assets, audio, IME) is the library's job:
+ * A game module subclasses this and adds nothing — identity comes from the
+ * bundle's `app.lua` (see [AppInfo]), the rest (GL surface, Lua VM, assets,
+ * audio, IME) is the library's job:
  *
  * ```kotlin
- * class Find5Activity : SoobActivity() {
- *     override val gameId = "find5"
- * }
+ * class Find5Activity : SoobActivity()
  * ```
  */
 open class SoobActivity : Activity() {
-
-    /**
-     * Identifies this game's saved options: `<filesDir>/<gameId>.dat`, in the
-     * same serialized format the desktop build writes (so a save file is
-     * portable). Override per game.
-     */
-    open val gameId: String
-        get() = "soob"
 
     lateinit var gameView: GameView
         private set
@@ -50,8 +42,12 @@ open class SoobActivity : Activity() {
         }
 
         Assets.attach(assets)
+        AppInfo.load()          // names the save file and picks the orientation
+        applyOrientation()
         Host.activity = this
-        Host.optFile = File(filesDir, "$gameId.dat")
+        // Saved options land in <filesDir>/<id>.dat, in the same serialized
+        // format the desktop build writes — so a save file is portable.
+        Host.optFile = File(filesDir, AppInfo.optFileName())
         Audio.init(this)
 
         val root = FrameLayout(this)
@@ -102,6 +98,18 @@ open class SoobActivity : Activity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) applyImmersive()
+    }
+
+    /**
+     * The manifest's `screenOrientation` is the default; the bundle gets the
+     * final say, so one player binary serves a landscape and a portrait game.
+     */
+    private fun applyOrientation() {
+        requestedOrientation = if (AppInfo.orientation == "portrait") {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
     }
 
     /** Run [block] on the GL thread, where the Lua VM lives. */

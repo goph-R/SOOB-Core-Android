@@ -25,6 +25,7 @@ soob-player/     the reusable library — everything that isn't game identity
   Audio.kt       SoundPool one-shots + dual-MediaPlayer music crossfade
   Input.kt       held keys / pointer state, Android key codes -> SDL names
   Ime.kt         hidden-EditText soft-keyboard bridge (imeShow / imeHide)
+  AppInfo.kt     the game's identity, read from the bundle's app.lua
   GameView.kt    GLSurfaceView, the frame loop, touch/key marshalling
   SoobActivity.kt fullscreen/lifecycle/back-button host activity
   Host.kt        the object bridge_jni.c calls (the __SOOB twin)
@@ -107,8 +108,12 @@ apply from: rootProject.file('gradle/syncGame.gradle')
 ```
 
 ```kotlin
-class MyGameActivity : SoobActivity() { override val gameId = "mygame" }
+class MyGameActivity : SoobActivity()
 ```
+
+The game names itself in its own `app.lua` (`name` / `id` / `orientation`), so
+the activity has nothing to override and the save file, orientation and title
+follow the bundle — see [`SOOB-Lua.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Lua.md).
 
 …or the same module living in the game's own repo, pulling the player in with
 `includeBuild '../SOOB-Core-Android'` — the way CoolFox consumes LisaEngine.
@@ -130,7 +135,8 @@ Either way the library is consumed, never forked.
 - **`noCompress`.** `wav`/`ogg`/`m4a` are stored uncompressed so `SoundPool`
   and `MediaPlayer` can seek an `AssetFileDescriptor`.
 - **Saves are the desktop format.** `optSave` writes the same `return { … }`
-  chunk to `<filesDir>/<gameId>.dat`, so a save moves between desktop and phone.
+  chunk to `<filesDir>/<id>.dat` — `id` from the bundle's `app.lua` — so a save
+  moves between desktop and phone.
 - **No FORTIFY for the vendored Lua.** A `TString` keeps its characters after
   the struct, so `__builtin_object_size(svalue(s))` is 0 and bionic's
   `__strchr_chk` aborts on `lgc.c`'s weak-table `strchr` during the first

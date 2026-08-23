@@ -26,6 +26,7 @@ tasks.register('syncGame', Sync) {
         include 'scripts/**'
         include 'assets/**'
         include 'assets.lua'
+        include 'app.lua'
         include 'config.lua'
     }
     into dest
