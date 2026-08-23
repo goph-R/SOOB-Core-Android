@@ -131,6 +131,10 @@ Either way the library is consumed, never forked.
   and `MediaPlayer` can seek an `AssetFileDescriptor`.
 - **Saves are the desktop format.** `optSave` writes the same `return { … }`
   chunk to `<filesDir>/<gameId>.dat`, so a save moves between desktop and phone.
+- **No FORTIFY for the vendored Lua.** A `TString` keeps its characters after
+  the struct, so `__builtin_object_size(svalue(s))` is 0 and bionic's
+  `__strchr_chk` aborts on `lgc.c`'s weak-table `strchr` during the first
+  `luaL_openlibs`. The CMake file turns FORTIFY off for Lua only.
 - **`requestQuit` is real here** (unlike on web) and BACK is the desktop
   Escape: it reaches Lua as `onKeyDown("escape")`, and a second press within
   two seconds finishes the activity.
@@ -146,6 +150,7 @@ checks on the binding argument marshalling; the 14 JNI entry points in
 `libsoob.so` match `Lua.kt` and all 34 host descriptors match the compiled
 `Host` class; BMFont unit tests pass against Find5's real `.fnt`.
 
-**Not yet run on a device** — rendering, audio, touch and the IME are unproven,
-so first boot on hardware is the next step. See the plan in
+Runs on hardware: first boot verified on a Redmi (Android 13, armeabi-v7a) —
+title screen renders, touch reaches the Lua hooks, Start game runs the level.
+Audio and the IME bridge still want a hands-on pass. See the plan in
 [`SOOB-Core/SOOB-Core-Android.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Core-Android.md).
