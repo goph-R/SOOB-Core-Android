@@ -27,5 +27,14 @@ target_compile_options(soob PRIVATE -O2 -fvisibility=hidden -Wall)
 
 # The vendored Lua is upstream C89 and trips -Wall on its own idioms; only our
 # bridge is held to the warning level.
-set_source_files_properties(${LUA_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+#
+# FORTIFY is also off for Lua, and that one is not cosmetic: a TString keeps its
+# characters in the bytes *after* the struct, so __builtin_object_size(svalue(s))
+# is 0 and bionic's __strchr_chk aborts the process on the first byte — even
+# though the string is NUL-terminated. It fires in lgc.c's weak-table check
+# (strchr(svalue(mode), 'k')) during the GC step inside luaL_openlibs, i.e. at
+# the very first newState(). Emscripten and MinGW have no FORTIFY, so the web,
+# desktop and host-harness builds never see it. bridge_jni.c keeps FORTIFY on.
+set_source_files_properties(${LUA_SOURCES} PROPERTIES
+    COMPILE_OPTIONS "-w;-U_FORTIFY_SOURCE;-D_FORTIFY_SOURCE=0")
 target_link_libraries(soob log)
