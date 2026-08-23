@@ -68,6 +68,13 @@ class GameView(private val activity: SoobActivity) : GLSurfaceView(activity) {
             if (booted) {
                 Log.i(TAG, "GL context recreated — reloading textures")
                 Assets.loadGraphics()
+            } else if (phase == Phase.LOADING || phase == Phase.FINISH) {
+                // Context died mid-load: the textures uploaded so far point at
+                // dead handles, so start the decode pass again. The Lua state
+                // is untouched and keeps its registries.
+                Log.i(TAG, "GL context recreated during load — restarting the decode")
+                Assets.beginLoad()
+                phase = Phase.LOADING
             }
             lastNanos = 0L
         }

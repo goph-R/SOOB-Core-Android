@@ -8,9 +8,30 @@ plugins {
 // consuming :soob-player through a composite build.
 ext.soobGame = file("$rootDir/../Find5")
 
+// Release signing is driven by an untracked keystore.properties at the repo
+// root (storeFile / storePassword / keyAlias / keyPassword). Without it the
+// release build still assembles — unsigned — so CI and clean checkouts work.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) {
+    keystoreFile.withInputStream { keystoreProps.load(it) }
+}
+def hasSigning = keystoreProps['storeFile'] != null
+
 android {
     namespace 'info.dynart.find5'
     compileSdk 36
+
+    signingConfigs {
+        release {
+            if (hasSigning) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
 
     defaultConfig {
         applicationId 'info.dynart.find5'
@@ -22,6 +43,7 @@ android {
 
     buildTypes {
         release {
+            if (hasSigning) signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

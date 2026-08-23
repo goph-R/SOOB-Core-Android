@@ -38,10 +38,15 @@ object Audio {
     private val lastVariant = HashMap<String, Int>()
 
     private var musicResolver: (String) -> String? = { null }
+
+    // Written from the GL thread (bindings), read on the main thread (ramp).
+    @Volatile
     private var masterVol = 1f
 
-    private var current: Track? = null
+    @Volatile
     private var desired: String? = null
+
+    private var current: Track? = null
     private var paused = false
 
     private lateinit var appContext: Context
@@ -222,6 +227,9 @@ object Audio {
         } catch (e: Exception) {
             Log.w(TAG, "music skipped: $assetPath ($e)")
             releaseTrack(track)
+            // Clear the dedupe key so a later musicPlay of the same track can
+            // retry instead of being swallowed as "already playing".
+            if (desired == name) desired = null
             return
         }
 

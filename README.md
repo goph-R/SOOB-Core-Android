@@ -50,6 +50,21 @@ siblings of this repo, plus the Android SDK 36 and NDK 29.
 adb logcat -s SOOB               # print(), engine messages, load errors
 ```
 
+For a signed release, put an untracked `keystore.properties` at the repo root:
+
+```properties
+storeFile=C:/keys/dynart.jks
+storePassword=...
+keyAlias=find5
+keyPassword=...
+```
+
+```sh
+./gradlew :app:bundleRelease     # AAB for Play; assembleRelease for an APK
+```
+
+Without that file the release build still assembles, unsigned.
+
 ## Adding another game
 
 Nothing in `soob-player` knows what Find5 is — the game contract is the Lua
