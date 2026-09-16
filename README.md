@@ -31,10 +31,12 @@ soob-player/     the reusable library — everything that isn't game identity
   Host.kt        the object bridge_jni.c calls (the __SOOB twin)
   Lua.kt         the native entry points
 
-app/             the thin Find5 module: applicationId, icon, versionCode,
-                 a 3-line SoobActivity subclass, and syncGame's output
+app/             the thin per-game module: applicationId, versionCode, icon.
+                 One line of identity; no Kotlin at all.
 gradle/
-  syncGame.gradle  copies a game bundle into an app module's assets
+  soobApp.gradle   everything an app module needs that isn't game identity
+  syncGame.gradle  copies a game bundle in, and generates the label/colour
+                   resources from its app.lua
 ```
 
 `app/src/main/assets/game/` is generated, not committed.
@@ -44,6 +46,21 @@ gradle/
 Needs [`SOOB-Core`](https://github.com/goph-R/SOOB-Core) (for the vendored Lua
 sources) and [`Find5`](https://github.com/goph-R/Find5) (the game bundle) as
 siblings of this repo, plus the Android SDK 36 and NDK 29.
+
+### Which game
+
+`gradle.properties`'s `soobGame` names the game folder (`../Find5` by default).
+Build a different one without editing anything:
+
+```sh
+./gradlew :app:assembleDebug -PsoobGame=../MyGame
+```
+
+The game supplies its identity in `app.lua` — `name` becomes the launcher
+label, `background` the window and adaptive-icon colour (both generated into
+`build/generated/soob/res` at build time), `id` the options filename, and
+`orientation` the screen orientation. Only `applicationId` and the launcher
+icon art stay in `app/`.
 
 ```sh
 ./gradlew :app:assembleDebug     # syncGame runs first, automatically
@@ -97,22 +114,32 @@ There are also JVM unit tests for BMFont: `./gradlew :soob-player:test`.
 ## Adding another game
 
 Nothing in `soob-player` knows what Find5 is — the game contract is the Lua
-bundle. A second game is either another module beside `app/`:
+bundle. To build one, just point `soobGame` at it (above). To *ship* one — its own
+applicationId and icon — add a module beside `app/`:
 
 ```groovy
 // app-mygame/build.gradle
-ext.soobGame = file("$rootDir/../MyGame")
-android { defaultConfig { applicationId 'info.dynart.mygame' } }
-dependencies { implementation project(':soob-player') }
-apply from: rootProject.file('gradle/syncGame.gradle')
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def appId = 'info.dynart.mygame'
+
+android {
+    namespace appId
+    defaultConfig { applicationId appId; versionCode 1; versionName '0.1.0' }
+}
+
+apply from: rootProject.file('gradle/soobApp.gradle')
 ```
 
-```kotlin
-class MyGameActivity : SoobActivity()
-```
+plus a manifest, `proguard-rules.pro`, `themes.xml` and the launcher icon —
+and set `soobGame` for it. There is **no Kotlin**: `SoobActivity` is concrete,
+so the manifest names `info.dynart.soob.SoobActivity` directly.
 
-The game names itself in its own `app.lua` (`name` / `id` / `orientation`), so
-the activity has nothing to override and the save file, orientation and title
+The game names itself in its own `app.lua` (`name` / `id` / `orientation` /
+`background`), so the save file, orientation, title and window colour all
 follow the bundle — see [`SOOB-Lua.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Lua.md).
 
 …or the same module living in the game's own repo, pulling the player in with

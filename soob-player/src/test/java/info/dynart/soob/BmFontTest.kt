@@ -54,16 +54,28 @@ class BmFontTest {
         assertEquals(0f, f.measure("?", 1f), 0.001f)     // unknown glyph: no advance
     }
 
+    /**
+     * Parse a real BMFont bake from whichever game this checkout builds, rather
+     * than a hand-written fixture. Skipped when the game isn't checked out
+     * beside the repo, or ships no .fnt.
+     *
+     * The path follows the `soobGame` Gradle property so the test tracks the
+     * same setting as the build; the default keeps the historical ../../Find5.
+     */
     @Test
-    fun parsesFind5Font() {
-        val fnt = File("../../Find5/assets/fonts/forgotten-futurist-22.fnt")
-        assumeTrue("Find5 checkout not present beside the repo", fnt.exists())
+    fun parsesRealGameFont() {
+        val game = System.getProperty("soobGame") ?: "../../Find5"
+        val fonts = File("$game/assets/fonts")
+        assumeTrue("no game font directory at $fonts", fonts.isDirectory)
 
-        val f = BmFont.parse(fnt.readText())
+        val fnt = fonts.listFiles { f -> f.name.endsWith(".fnt") }?.firstOrNull()
+        assumeTrue("game ships no .fnt in $fonts", fnt != null)
+
+        val f = BmFont.parse(fnt!!.readText())
         assertTrue("expected a full ASCII range, got ${f.glyphs.size}", f.glyphs.size > 90)
         assertTrue(f.lineHeight > 0)
         assertTrue(f.pageFile.endsWith(".png"))
         assertNotNull("space must be present for word spacing", f.glyphs[' '.code])
-        assertTrue(f.measure("Find5", 1f) > 0f)
+        assertTrue(f.measure("SOOB", 1f) > 0f)
     }
 }

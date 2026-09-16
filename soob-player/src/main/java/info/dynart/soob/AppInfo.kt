@@ -32,6 +32,30 @@ object AppInfo {
     var description = ""
         private set
 
+    /** "#rrggbb" clear colour — the same value the desktop and web hosts use. */
+    var background = "#14141f"
+        private set
+
+    // The same colour as GL-ready 0..1 components, parsed once at load(). The
+    // renderer reads these every frame, so they must not allocate.
+    var bgR = 0.08f
+        private set
+    var bgG = 0.08f
+        private set
+    var bgB = 0.12f
+        private set
+
+    private fun parseBackground() {
+        val hex = background.removePrefix("#")
+        try {
+            bgR = hex.substring(0, 2).toInt(16) / 255f
+            bgG = hex.substring(2, 4).toInt(16) / 255f
+            bgB = hex.substring(4, 6).toInt(16) / 255f
+        } catch (e: Exception) {
+            // Malformed: keep the defaults rather than going black.
+        }
+    }
+
     private val FIELD = Regex("""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 
     fun parse(src: String) {
@@ -47,6 +71,7 @@ object AppInfo {
                 "id" -> id = value
                 "orientation" -> orientation = if (value == "portrait") "portrait" else "landscape"
                 "description" -> description = value
+                "background" -> if (value.matches(Regex("#[0-9a-fA-F]{6}"))) background = value
             }
         }
     }
@@ -59,9 +84,12 @@ object AppInfo {
             return
         }
         parse(text)
-        Log.i(TAG, "app: $name (id=$id, $orientation)")
+        parseBackground()
+        Log.i(TAG, "app: $name (id=$id, $orientation, bg=$background)")
     }
 
     /** The save file's name — the same stem the desktop build writes. */
     fun optFileName(): String = "$id.dat"
+
+
 }

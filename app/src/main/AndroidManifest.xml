@@ -11,8 +11,12 @@
         android:label="@string/app_name"
         android:theme="@style/SoobTheme">
 
+        <!-- SoobActivity is the player's own activity: a game needs no subclass.
+             screenOrientation here is only the pre-boot default; the bundle's
+             app.lua has the final say (SoobActivity.applyOrientation), so one
+             player binary serves a landscape and a portrait game. -->
         <activity
-            android:name=".Find5Activity"
+            android:name="info.dynart.soob.SoobActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"

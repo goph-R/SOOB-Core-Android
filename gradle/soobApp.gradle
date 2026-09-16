@@ -1,0 +1,91 @@
+// soobApp — everything an app module needs that is NOT game identity.
+//
+// A SOOB game's build.gradle is then just its own ids:
+//
+//     plugins {
+//         id 'com.android.application'
+//         id 'org.jetbrains.kotlin.android'
+//     }
+//
+//     def appId = 'com.example.mygame'
+//
+//     android {
+//         namespace appId
+//         defaultConfig {
+//             applicationId appId
+//             versionCode 1
+//             versionName '0.1.0'
+//         }
+//     }
+//
+//     apply from: rootProject.file('gradle/soobApp.gradle')
+//
+// Apply it AFTER the android { } block so the module's own settings are in
+// place. A game living in its own repo and consuming :soob-player through a
+// composite build applies it by path instead:
+//     apply from: file("$rootDir/../SOOB-Core-Android/gradle/soobApp.gradle")
+
+// Release signing is driven by an untracked keystore.properties at the repo
+// root (storeFile / storePassword / keyAlias / keyPassword). Without it the
+// release build still assembles — unsigned — so CI and clean checkouts work.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) {
+    keystoreFile.withInputStream { keystoreProps.load(it) }
+}
+def hasSigning = keystoreProps['storeFile'] != null
+
+android {
+    compileSdk 36
+
+    signingConfigs {
+        release {
+            if (hasSigning) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    defaultConfig {
+        minSdk 27
+        targetSdk 36
+    }
+
+    buildTypes {
+        release {
+            if (hasSigning) signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    androidResources {
+        // SoundPool and MediaPlayer read assets through an AssetFileDescriptor,
+        // which needs the file stored uncompressed inside the APK. This has to
+        // live in the application module — a library's noCompress does not
+        // merge into its consumer — which is why it sits here and not in
+        // :soob-player.
+        noCompress += ['wav', 'ogg', 'm4a']
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    buildFeatures {
+        buildConfig false
+    }
+}
+
+dependencies {
+    implementation project(':soob-player')
+}
+
+apply from: rootProject.file('gradle/syncGame.gradle')

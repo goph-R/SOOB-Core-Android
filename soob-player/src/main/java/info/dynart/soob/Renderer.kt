@@ -208,7 +208,10 @@ void main() { gl_FragColor = texture2D(u_tex, v_uv) * v_col; }"""
     fun beginFrame() {
         GLES20.glUseProgram(prog)
         GLES20.glUniform2f(uScale, 2f / vw, -2f / vh)   // center origin, Y-down
-        GLES20.glClearColor(0.08f, 0.08f, 0.12f, 1f)
+        // Clear colour comes from the bundle's app.lua, so the GL clear and the
+        // pre-boot window background (a generated resource) agree. Parsed once
+        // at AppInfo.load(); these are plain floats, so no per-frame allocation.
+        GLES20.glClearColor(AppInfo.bgR, AppInfo.bgG, AppInfo.bgB, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         used = 0
         curTex = 0

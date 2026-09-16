@@ -1,24 +1,37 @@
-// syncGame — copy a game bundle into this app module's assets, the Gradle twin
+// syncGame — copy a game bundle into this app module's assets, and generate the
+// resources that must carry the game's identity at build time. The Gradle twin
 // of SOOB-Core-Web's scripts/sync-game.mjs.
 //
 // The game repo stays the single source of truth: this only copies, never
-// forks. Applied by an app module that sets `soobGame` to the bundle root:
+// forks. Which game is resolved in this order:
 //
-//     ext.soobGame = file("$rootDir/../Find5")
-//     apply from: rootProject.file('gradle/syncGame.gradle')
+//   1. -PsoobGame=../MyGame          one-off / CI override
+//   2. soobGame in gradle.properties  the tracked default
+//   3. ext.soobGame set by the module (back-compat)
+//
+// Applied by an app module (normally via soobApp.gradle, which applies it).
 
-def bundle = project.ext.soobGame
+def resolveBundle = {
+    def prop = project.findProperty('soobGame')
+    if (prop) return rootProject.file(prop.toString())
+    if (project.ext.has('soobGame')) return project.ext.soobGame as File
+    throw new GradleException(
+        "No game configured. Set soobGame in gradle.properties or pass -PsoobGame=../MyGame.")
+}
+
+def bundle = resolveBundle()
 def dest = layout.projectDirectory.dir('src/main/assets/game')
+def genRes = layout.buildDirectory.dir('generated/soob/res')
 
 tasks.register('syncGame', Sync) {
-    description = 'Copy the game bundle (scripts, assets, assets.lua) into src/main/assets/game.'
+    description = 'Copy the game bundle (scripts, assets, assets.lua, app.lua) into src/main/assets/game.'
     group = 'build'
 
     doFirst {
         if (!bundle.exists()) {
             throw new GradleException(
                 "syncGame: game bundle not found at ${bundle}.\n" +
-                "The game repo must be checked out as a sibling of this repo.")
+                "Set soobGame in gradle.properties, or check the game out beside this repo.")
         }
     }
 
@@ -27,9 +40,77 @@ tasks.register('syncGame', Sync) {
         include 'assets/**'
         include 'assets.lua'
         include 'app.lua'
-        include 'config.lua'
+        // NOTE: config.lua is deliberately NOT copied. Every field in it
+        // (width, height, fullscreen, vsync, render, depth) is desktop-only;
+        // nothing in the player has ever read it.
     }
     into dest
 }
 
-tasks.named('preBuild') { dependsOn 'syncGame' }
+// The launcher label and the pre-boot window colour have to exist as resources
+// before any code runs, so they cannot come from AppInfo at runtime the way the
+// options filename and the orientation do. Generate them from the same app.lua
+// instead, so the game is still named in exactly one place.
+//
+// Output goes to a build-dir source set, never into tracked src/main/res — a
+// failure then reads as "missing resource" rather than "duplicate resource".
+tasks.register('generateSoobResources') {
+    description = 'Write app_name and the window/icon background from the game bundle app.lua.'
+    group = 'build'
+
+    inputs.file(new File(bundle, 'app.lua')).optional(true)
+    outputs.dir(genRes)
+
+    doLast {
+        def name = 'SOOB'
+        def background = '#14141F'
+
+        def appLua = new File(bundle, 'app.lua')
+        if (appLua.exists()) {
+            // Same shape as AppInfo.kt's parser: drop comments, then scan
+            // key = "value" pairs. app.lua is a flat table of strings.
+            def body = appLua.getText('UTF-8')
+                    .replaceAll(/(?s)--\[\[.*?\]\]/, '')
+                    .replaceAll(/--[^\n]*/, '')
+            def m = (body =~ /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/)
+            while (m.find()) {
+                def value = m.group(2) ?: m.group(3)
+                if (m.group(1) == 'name') name = value
+                else if (m.group(1) == 'background' && value ==~ /#[0-9a-fA-F]{6}/) background = value
+            }
+        } else {
+            logger.warn('generateSoobResources: no app.lua in the bundle — using defaults')
+        }
+
+        // Android string resources are not plain XML: aapt2 rejects a bare
+        // apostrophe ("Apostrophe not preceded by \\") and a bare double quote,
+        // on top of the usual XML escapes. A game called "Bob's Quest" would
+        // otherwise fail the resource build.
+        def escaped = name.replace('\\', '\\\\')
+                          .replace('&', '&amp;')
+                          .replace('<', '&lt;')
+                          .replace("'", "\\'")
+                          .replace('"', '\\"')
+
+        def out = genRes.get().dir('values').asFile
+        out.mkdirs()
+        new File(out, 'soob_generated.xml').write("""<?xml version="1.0" encoding="utf-8"?>
+<!-- GENERATED from the game bundle's app.lua by generateSoobResources. Do not edit. -->
+<resources>
+    <string name="app_name">${escaped}</string>
+    <!-- Matches the renderer's clear colour, so the window doesn't flash. -->
+    <color name="soob_bg">${background}</color>
+    <color name="ic_launcher_background">${background}</color>
+</resources>
+""", 'UTF-8')
+    }
+}
+
+android.sourceSets.main.res.srcDir(genRes)
+
+tasks.named('preBuild') { dependsOn 'syncGame', 'generateSoobResources' }
+
+// Be explicit rather than relying on preBuild ordering: every resource-merge
+// task must see the generated values directory already written.
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('Resources') }
+     .configureEach { dependsOn 'generateSoobResources' }
