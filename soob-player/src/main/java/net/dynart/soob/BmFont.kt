@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 /**
  * AngelCode BMFont (`.fnt` text format) parsing, measuring and drawing —

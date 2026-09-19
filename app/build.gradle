@@ -3,11 +3,17 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-// The only per-game line in this file. Everything else — SDK levels, signing,
-// noCompress, the :soob-player dependency, the game-bundle sync — is in
-// gradle/soobApp.gradle; the game's name, icon colour and orientation come from
-// the bundle's app.lua.
-def appId = 'info.dynart.find5'
+// The dev harness, not a shipping game. It exists so `-PsoobGame=../MyGame`
+// can put any bundle on a device straight from this repo, and as the worked
+// example an app module is cut from. Its applicationId is deliberately
+// generic: a game that ships carries its own module in its own repo, the way
+// Find5 does in Find5/android — see "Adding another game" in the README.
+//
+// Everything else — SDK levels, signing, noCompress, the :soob-player
+// dependency, the game-bundle sync — is in gradle/soobApp.gradle; the bundle's
+// app.lua supplies the name, icon colour and orientation, so this module needs
+// no edit when you point it at a different game.
+def appId = 'net.dynart.soob.demo'
 
 android {
     namespace appId

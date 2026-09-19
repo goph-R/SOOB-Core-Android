@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 /**
  * The Lua VM, as seen from Kotlin — the twin of SOOB-Core-Web's `src/host/lua.ts`.

@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

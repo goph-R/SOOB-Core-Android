@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 import android.graphics.Bitmap
 import android.opengl.GLES20

@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 import android.app.Activity
 import android.content.pm.ActivityInfo

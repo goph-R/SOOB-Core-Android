@@ -4,7 +4,7 @@
  * the sandbox, the package.loaders asset searcher, the assets.lua walk, the
  * binding argument marshalling and the hook dispatch) is plain C behind the
  * JNI function table. This harness supplies a stub table plus a C mirror of
- * info.dynart.soob.Host, then boots a real game bundle through the unmodified
+ * net.dynart.soob.Host, then boots a real game bundle through the unmodified
  * bridge and reports what the Lua actually did.
  *
  *     ./build.sh && ./host_test.exe ../../../Find5
@@ -130,7 +130,7 @@ static unsigned char *readBundleFile(const char *rel, int *outLen) {
  * ------------------------------------------------------------------------- */
 static jclass st_FindClass(JNIEnv *env, const char *name) {
     (void)env;
-    if (strcmp(name, "info/dynart/soob/Host") != 0) {
+    if (strcmp(name, "net/dynart/soob/Host") != 0) {
         fprintf(stderr, "FindClass: unexpected class %s\n", name);
         return 0;
     }
@@ -395,19 +395,19 @@ static void initJni(void) {
 }
 
 /* ---- the bridge's entry points (same symbols the JVM would bind) ---- */
-extern jboolean Java_info_dynart_soob_Lua_newState(JNIEnv *, jobject);
-extern jboolean Java_info_dynart_soob_Lua_doAsset(JNIEnv *, jobject, jstring);
-extern jboolean Java_info_dynart_soob_Lua_doString(JNIEnv *, jobject, jstring);
-extern jboolean Java_info_dynart_soob_Lua_loadAssets(JNIEnv *, jobject, jstring);
-extern void Java_info_dynart_soob_Lua_callHook0(JNIEnv *, jobject, jstring);
-extern void Java_info_dynart_soob_Lua_update(JNIEnv *, jobject, jdouble);
-extern void Java_info_dynart_soob_Lua_render(JNIEnv *, jobject);
-extern void Java_info_dynart_soob_Lua_mouseDown(JNIEnv *, jobject, jdouble, jdouble, jint);
-extern void Java_info_dynart_soob_Lua_mouseUp(JNIEnv *, jobject, jdouble, jdouble, jint);
-extern void Java_info_dynart_soob_Lua_mouseMove(JNIEnv *, jobject, jdouble, jdouble, jdouble, jdouble);
-extern void Java_info_dynart_soob_Lua_keyDown(JNIEnv *, jobject, jstring);
-extern void Java_info_dynart_soob_Lua_keyUp(JNIEnv *, jobject, jstring);
-extern void Java_info_dynart_soob_Lua_destroy(JNIEnv *, jobject);
+extern jboolean Java_net_dynart_soob_Lua_newState(JNIEnv *, jobject);
+extern jboolean Java_net_dynart_soob_Lua_doAsset(JNIEnv *, jobject, jstring);
+extern jboolean Java_net_dynart_soob_Lua_doString(JNIEnv *, jobject, jstring);
+extern jboolean Java_net_dynart_soob_Lua_loadAssets(JNIEnv *, jobject, jstring);
+extern void Java_net_dynart_soob_Lua_callHook0(JNIEnv *, jobject, jstring);
+extern void Java_net_dynart_soob_Lua_update(JNIEnv *, jobject, jdouble);
+extern void Java_net_dynart_soob_Lua_render(JNIEnv *, jobject);
+extern void Java_net_dynart_soob_Lua_mouseDown(JNIEnv *, jobject, jdouble, jdouble, jint);
+extern void Java_net_dynart_soob_Lua_mouseUp(JNIEnv *, jobject, jdouble, jdouble, jint);
+extern void Java_net_dynart_soob_Lua_mouseMove(JNIEnv *, jobject, jdouble, jdouble, jdouble, jdouble);
+extern void Java_net_dynart_soob_Lua_keyDown(JNIEnv *, jobject, jstring);
+extern void Java_net_dynart_soob_Lua_keyUp(JNIEnv *, jobject, jstring);
+extern void Java_net_dynart_soob_Lua_destroy(JNIEnv *, jobject);
 
 #define STR(s) st_NewStringUTF(0, s)
 
@@ -429,7 +429,7 @@ static void checkNum(double got, double want, const char *what) {
    value by value — the part of the bridge most likely to drift silently. */
 static void checkBindingMarshalling(JNIEnv *env) {
     printf("\n-- binding marshalling --\n");
-    Java_info_dynart_soob_Lua_doString(env, 0, STR(
+    Java_net_dynart_soob_Lua_doString(env, 0, STR(
         "function onRender()\n"
         "  drawRegion('logo', 10, 20, { align = ALIGN_RIGHT + ALIGN_BOTTOM, flip = FLIP_H,\n"
         "      fillX = 0.5, fillY = 0.25, scaleX = 2, scaleY = 3, rotation = 1.5,\n"
@@ -442,7 +442,7 @@ static void checkBindingMarshalling(JNIEnv *env) {
         "  drawBlur('image_1a', { width = 32, alpha = 0.3 })\n"
         "  imeShow(11, 22, 33, 44)\n"
         "end\n"));
-    Java_info_dynart_soob_Lua_render(env, 0);
+    Java_net_dynart_soob_Lua_render(env, 0);
 
     checkNum(C.region[0], 10, "drawRegion x");
     checkNum(C.region[2], 4 + 32, "drawRegion align (RIGHT|BOTTOM)");
@@ -485,13 +485,13 @@ static void checkBindingMarshalling(JNIEnv *env) {
     checkNum(C.imeH, 44, "imeShow h");
 
     /* Defaults: the positional form and a bare call. */
-    Java_info_dynart_soob_Lua_doString(env, 0, STR(
+    Java_net_dynart_soob_Lua_doString(env, 0, STR(
         "function onRender()\n"
         "  drawRegion('logo', 1, 2)\n"
         "  drawEllipse(0, 0, 5, 5)\n"
         "  drawBlur('image_1a')\n"
         "end\n"));
-    Java_info_dynart_soob_Lua_render(env, 0);
+    Java_net_dynart_soob_Lua_render(env, 0);
     checkNum(C.region[4], 1, "drawRegion fillX defaults to 1");
     checkNum(C.region[6], 1, "drawRegion scale defaults to 1");
     checkNum(C.region[12], 1, "drawRegion alpha defaults to 1");
@@ -506,41 +506,41 @@ int main(int argc, char **argv) {
     printf("game bundle: %s\n\n", g_gameDir);
     initJni();
 
-    check(Java_info_dynart_soob_Lua_newState(&g_env, 0), "newState");
-    Java_info_dynart_soob_Lua_doString(&g_env, 0, STR("platform=\"hosttest\""));
+    check(Java_net_dynart_soob_Lua_newState(&g_env, 0), "newState");
+    Java_net_dynart_soob_Lua_doString(&g_env, 0, STR("platform=\"hosttest\""));
 
-    check(Java_info_dynart_soob_Lua_loadAssets(&g_env, 0, STR("assets.lua")), "loadAssets");
+    check(Java_net_dynart_soob_Lua_loadAssets(&g_env, 0, STR("assets.lua")), "loadAssets");
     check(S.regTextures > 0, "textures registered");
     check(S.regRegions > 0, "regions registered");
     check(S.regFonts > 0, "fonts registered");
     check(S.regSounds > 0, "sounds registered");
 
-    check(Java_info_dynart_soob_Lua_doAsset(&g_env, 0, STR("scripts/main.lua")), "run main.lua");
+    check(Java_net_dynart_soob_Lua_doAsset(&g_env, 0, STR("scripts/main.lua")), "run main.lua");
     check(S.assetReads > 2, "require() resolved modules through the asset searcher");
 
-    Java_info_dynart_soob_Lua_callHook0(&g_env, 0, STR("onStart"));
+    Java_net_dynart_soob_Lua_callHook0(&g_env, 0, STR("onStart"));
 
     for (int i = 0; i < 3; i++) {
-        Java_info_dynart_soob_Lua_update(&g_env, 0, 1.0 / 60.0);
-        Java_info_dynart_soob_Lua_render(&g_env, 0);
+        Java_net_dynart_soob_Lua_update(&g_env, 0, 1.0 / 60.0);
+        Java_net_dynart_soob_Lua_render(&g_env, 0);
     }
     int drewSomething = S.drawRegion + S.drawText + S.drawQuad + S.drawBg + S.drawEllipse + S.drawBlur;
     check(drewSomething > 0, "the first scene draws");
 
     /* A click in the middle of the view, then a key, then a frame. */
-    Java_info_dynart_soob_Lua_mouseMove(&g_env, 0, 0, 0, 0, 0);
-    Java_info_dynart_soob_Lua_mouseDown(&g_env, 0, 0, 0, 1);
-    Java_info_dynart_soob_Lua_mouseUp(&g_env, 0, 0, 0, 1);
-    Java_info_dynart_soob_Lua_keyDown(&g_env, 0, STR("escape"));
-    Java_info_dynart_soob_Lua_keyUp(&g_env, 0, STR("escape"));
-    Java_info_dynart_soob_Lua_update(&g_env, 0, 1.0 / 60.0);
-    Java_info_dynart_soob_Lua_render(&g_env, 0);
+    Java_net_dynart_soob_Lua_mouseMove(&g_env, 0, 0, 0, 0, 0);
+    Java_net_dynart_soob_Lua_mouseDown(&g_env, 0, 0, 0, 1);
+    Java_net_dynart_soob_Lua_mouseUp(&g_env, 0, 0, 0, 1);
+    Java_net_dynart_soob_Lua_keyDown(&g_env, 0, STR("escape"));
+    Java_net_dynart_soob_Lua_keyUp(&g_env, 0, STR("escape"));
+    Java_net_dynart_soob_Lua_update(&g_env, 0, 1.0 / 60.0);
+    Java_net_dynart_soob_Lua_render(&g_env, 0);
 
     /* Options round-trip: set, save (the desktop file format), reload. */
-    Java_info_dynart_soob_Lua_doString(&g_env, 0, STR(
+    Java_net_dynart_soob_Lua_doString(&g_env, 0, STR(
         "optSet('host_test', {level=3, name='abc', on=true}) optSave()"));
     check(S.savedOpts && strstr(S.savedOpts, "host_test") != 0, "optSave wrote the opts chunk");
-    Java_info_dynart_soob_Lua_doString(&g_env, 0, STR(
+    Java_net_dynart_soob_Lua_doString(&g_env, 0, STR(
         "optLoad() local t = optGet('host_test') "
         "assert(t and t.level == 3 and t.name == 'abc' and t.on == true, 'opts round-trip')"));
     check(1, "optLoad round-tripped the table");
@@ -556,7 +556,7 @@ int main(int argc, char **argv) {
     printf("assets read from the bundle: %d (misses: %d)\n", S.assetReads, S.assetMisses);
     printf("last region drawn: %s | last text: %s\n", S.lastRegion, S.lastText);
 
-    Java_info_dynart_soob_Lua_destroy(&g_env, 0);
+    Java_net_dynart_soob_Lua_destroy(&g_env, 0);
     printf("\n%s\n", fails ? "FAILURES" : "all checks passed");
     return fails ? 1 : 0;
 }

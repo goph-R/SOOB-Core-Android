@@ -31,30 +31,40 @@ soob-player/     the reusable library — everything that isn't game identity
   Host.kt        the object bridge_jni.c calls (the __SOOB twin)
   Lua.kt         the native entry points
 
-app/             the thin per-game module: applicationId, versionCode, icon.
-                 One line of identity; no Kotlin at all.
+app/             the dev harness: a generic app module (net.dynart.soob.demo)
+                 that puts any bundle on a device. A shipping game carries its
+                 own copy of this in its own repo. No Kotlin at all.
 gradle/
   soobApp.gradle   everything an app module needs that isn't game identity
-  syncGame.gradle  copies a game bundle in, and generates the label/colour
-                   resources from its app.lua
+  syncGame.gradle  copies a game bundle in (plus SOOB-Core's scripts/engine),
+                   and generates the label/colour resources from its app.lua
 ```
+
+Both gradle/ scripts work from this root or from a game repo's own `android/`
+folder: the `:soob-player` dependency falls back to the published coordinate
+when the project path is absent, and each script locates its siblings relative
+to itself rather than to `rootProject`.
 
 `app/src/main/assets/game/` is generated, not committed.
 
 ## Build
 
 Needs [`SOOB-Core`](https://github.com/goph-R/SOOB-Core) (for the vendored Lua
-sources) and [`Find5`](https://github.com/goph-R/Find5) (the game bundle) as
-siblings of this repo, plus the Android SDK 36 and NDK 29.
+sources **and** `scripts/engine`, which `syncGame` copies into the bundle) and
+[`Find5`](https://github.com/goph-R/Find5) (the game bundle) as siblings of this
+repo, plus the Android SDK 36 and NDK 29.
 
 ### Which game
 
-`gradle.properties`'s `soobGame` names the game folder (`../Find5` by default).
-Build a different one without editing anything:
+`:app` here is a harness, not a product — it installs as `net.dynart.soob.demo`
+whatever bundle you point it at. `gradle.properties`'s `soobGame` names that
+folder (`../Find5` by default); override it per invocation:
 
 ```sh
 ./gradlew :app:assembleDebug -PsoobGame=../MyGame
 ```
+
+**Find5's own APK is built from Find5, not from here** — see below.
 
 The game supplies its identity in `app.lua` — `name` becomes the launcher
 label, `background` the window and adaptive-icon colour (both generated into
@@ -114,36 +124,36 @@ There are also JVM unit tests for BMFont: `./gradlew :soob-player:test`.
 ## Adding another game
 
 Nothing in `soob-player` knows what Find5 is — the game contract is the Lua
-bundle. To build one, just point `soobGame` at it (above). To *ship* one — its own
-applicationId and icon — add a module beside `app/`:
+bundle. To *build* one, just point `soobGame` at it (above).
 
-```groovy
-// app-mygame/build.gradle
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
+To *ship* one — its own applicationId, icon and Play listing — the app module
+belongs in **the game's own repo**, pulling the player in with
+`includeBuild '../SOOB-Core-Android'`, the way CoolFox consumes LisaEngine.
+That is where Find5's module now lives:
 
-def appId = 'info.dynart.mygame'
-
-android {
-    namespace appId
-    defaultConfig { applicationId appId; versionCode 1; versionName '0.1.0' }
-}
-
-apply from: rootProject.file('gradle/soobApp.gradle')
+```sh
+cd ../Find5/android
+./gradlew :app:assembleDebug     # net.dynart.find5; builds :soob-player for you
 ```
 
-plus a manifest, `proguard-rules.pro`, `themes.xml` and the launcher icon —
-and set `soobGame` for it. There is **no Kotlin**: `SoobActivity` is concrete,
-so the manifest names `info.dynart.soob.SoobActivity` directly.
+[`SOOB-Template`](https://github.com/goph-R/SOOB-Template) carries the same
+module ready-made as its `android/` folder: clone-and-rename gives you an APK,
+and `tools/rename.sh "My Game" mygame com.example.mygame` sets the
+applicationId along with everything else. Copy that folder into an existing
+game repo to retrofit one — set `def appId`, drop in the launcher icon, and
+`rootProject.name`; `soobGame=..` and `soobPlayer` already point the right way.
 
 The game names itself in its own `app.lua` (`name` / `id` / `orientation` /
-`background`), so the save file, orientation, title and window colour all
-follow the bundle — see [`SOOB-Lua.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Lua.md).
+`background`), so the save file, orientation, launcher label and window colour
+all follow the bundle — see
+[`SOOB-Lua.md`](https://github.com/goph-R/SOOB-Core/blob/main/SOOB-Lua.md).
+Only the applicationId and the icon art stay in the module, and there is **no
+Kotlin**: `SoobActivity` is concrete, so the manifest names
+`net.dynart.soob.SoobActivity` directly.
 
-…or the same module living in the game's own repo, pulling the player in with
-`includeBuild '../SOOB-Core-Android'` — the way CoolFox consumes LisaEngine.
+A second module beside `app/` in *this* repo works too — same `build.gradle`,
+`apply from: rootProject.file('gradle/soobApp.gradle')` — but it puts one
+game's store identity in the player's repo, so prefer the game-repo module.
 Either way the library is consumed, never forked.
 
 ## Notes for the port
@@ -182,6 +192,8 @@ Verified: the C bridge boots Find5's real bundle in the host harness (assets,
 checks on the binding argument marshalling; the 14 JNI entry points in
 `libsoob.so` match `Lua.kt` and all 34 host descriptors match the compiled
 `Host` class; BMFont unit tests pass against Find5's real `.fnt`.
+
+Find5's shipping module lives in `Find5/android`; `:app` here is the harness.
 
 Runs on hardware — verified end to end on a Redmi (Android 13, armeabi-v7a):
 the title screen renders, touch reaches the Lua hooks, a level plays, and audio

@@ -16,7 +16,7 @@
              app.lua has the final say (SoobActivity.applyOrientation), so one
              player binary serves a landscape and a portrait game. -->
         <activity
-            android:name="info.dynart.soob.SoobActivity"
+            android:name="net.dynart.soob.SoobActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"

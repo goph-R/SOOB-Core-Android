@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 import android.content.Context
 import android.media.AudioAttributes

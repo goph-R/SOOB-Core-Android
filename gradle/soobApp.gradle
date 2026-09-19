@@ -23,7 +23,10 @@
 // Apply it AFTER the android { } block so the module's own settings are in
 // place. A game living in its own repo and consuming :soob-player through a
 // composite build applies it by path instead:
-//     apply from: file("$rootDir/../SOOB-Core-Android/gradle/soobApp.gradle")
+//     apply from: file("$rootDir/../../SOOB-Core-Android/gradle/soobApp.gradle")
+// (SOOB-Template's android/ folder is exactly that arrangement.) Everything
+// below works from either root — the :soob-player dependency and the syncGame
+// apply both detect which build they are in.
 
 // Release signing is driven by an untracked keystore.properties at the repo
 // root (storeFile / storePassword / keyAlias / keyPassword). Without it the
@@ -85,7 +88,20 @@ android {
 }
 
 dependencies {
-    implementation project(':soob-player')
+    // Inside SOOB-Core-Android the player is a sibling project. A game module in
+    // its own repo reaches the same library through
+    //     includeBuild '../SOOB-Core-Android'
+    // where ':soob-player' is not a path in this build — Gradle substitutes the
+    // coordinate for the included build's project instead. No version: the
+    // substitution supplies it, exactly as CoolFox asks for 'net.dynart.lisa:core'.
+    if (rootProject.findProject(':soob-player') != null) {
+        implementation project(':soob-player')
+    } else {
+        implementation 'net.dynart.soob:soob-player'
+    }
 }
 
-apply from: rootProject.file('gradle/syncGame.gradle')
+// Resolve the sibling script relative to THIS file, not to rootProject: when a
+// game repo applies soobApp.gradle by path, rootProject is the game's android/
+// folder and has no gradle/ directory of its own.
+apply from: new File(buildscript.sourceFile.parentFile, 'syncGame.gradle')

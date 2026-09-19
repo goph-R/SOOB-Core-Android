@@ -23,8 +23,22 @@ def bundle = resolveBundle()
 def dest = layout.projectDirectory.dir('src/main/assets/game')
 def genRes = layout.buildDirectory.dir('generated/soob/res')
 
+// scripts/engine is generated everywhere: SOOB-Core owns it, and every desktop
+// build copies it into the game folder (soob.mk's `scripts/engine` rule,
+// soob.cmake's copy step) where it is gitignored. So a freshly cloned game has
+// no engine modules until something copies them, and `require "engine.scene"`
+// would fail at boot with a perfectly successful build behind it.
+//
+// Copy it here too, straight into the packaged bundle rather than into the game
+// folder, so an Android-only machine needs no desktop toolchain and the game
+// repo is never written to. Located relative to THIS script: SOOB-Core is a
+// sibling of SOOB-Core-Android wherever the consuming root is, the same
+// assumption soob-player's CMakeLists.txt makes for the Lua sources.
+def engineDir = new File(
+        buildscript.sourceFile.parentFile.parentFile.parentFile, 'SOOB-Core/scripts/engine')
+
 tasks.register('syncGame', Sync) {
-    description = 'Copy the game bundle (scripts, assets, assets.lua, app.lua) into src/main/assets/game.'
+    description = 'Copy the game bundle plus SOOB-Core engine modules into src/main/assets/game.'
     group = 'build'
 
     doFirst {
@@ -33,7 +47,17 @@ tasks.register('syncGame', Sync) {
                 "syncGame: game bundle not found at ${bundle}.\n" +
                 "Set soobGame in gradle.properties, or check the game out beside this repo.")
         }
+        if (!engineDir.exists()) {
+            throw new GradleException(
+                "syncGame: engine modules not found at ${engineDir}." +
+                "\nCheck SOOB-Core out as a sibling of SOOB-Core-Android.")
+        }
     }
+
+    // The game's own scripts/engine (left behind by a desktop build) and
+    // SOOB-Core's are the same files. Take the later `from` -- SOOB-Core, the
+    // source of truth -- rather than failing on the duplicate.
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 
     from(bundle) {
         include 'scripts/**'
@@ -43,6 +67,10 @@ tasks.register('syncGame', Sync) {
         // NOTE: config.lua is deliberately NOT copied. Every field in it
         // (width, height, fullscreen, vsync, render, depth) is desktop-only;
         // nothing in the player has ever read it.
+    }
+    from(engineDir) {
+        include '*.lua'
+        into 'scripts/engine'
     }
     into dest
 }

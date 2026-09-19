@@ -1,4 +1,4 @@
-package info.dynart.soob
+package net.dynart.soob
 
 import android.opengl.GLSurfaceView
 import android.util.Log
@@ -6,7 +6,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 // Inside a GLSurfaceView subclass the bare name `Renderer` resolves to the
 // inherited GLSurfaceView.Renderer interface, so the batcher gets an alias.
-import info.dynart.soob.Renderer as Gfx
+import net.dynart.soob.Renderer as Gfx
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 

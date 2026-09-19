@@ -9,7 +9,7 @@
  * sibling of SOOB-Core-Web's src/wasm/bridge.c — the arg-reading logic (option
  * tables, defaults) is the same port of the scr* wrappers in script.h, and the
  * only difference is the host import layer: JNI calls into the Kotlin
- * info.dynart.soob.Host object instead of EM_JS calls into globalThis.__SOOB.
+ * net.dynart.soob.Host object instead of EM_JS calls into globalThis.__SOOB.
  *
  * Geometry that needs texture sizes (drawRegion UV/dest math, ellipse
  * tessellation) is done host-side in Renderer/Host; here we only forward the
@@ -36,13 +36,13 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
-#define JNIFN(name) JNIEXPORT JNICALL Java_info_dynart_soob_Lua_##name
+#define JNIFN(name) JNIEXPORT JNICALL Java_net_dynart_soob_Lua_##name
 
 static lua_State *gL = 0;
 static double g_args[64];   /* scratch bundle shared with the Kotlin host */
 
 static JNIEnv *g_env = 0;   /* the current entry point's env (GL thread only) */
-static jclass g_host = 0;   /* global ref to info.dynart.soob.Host */
+static jclass g_host = 0;   /* global ref to net.dynart.soob.Host */
 
 /* ---------------------------------------------------------------------------
  * Host imports. Each is the JNI twin of one EM_JS stub in the web bridge.
@@ -671,7 +671,7 @@ static int walkStrings(lua_State *L, int t, const char *field,
  * ------------------------------------------------------------------------- */
 static int cacheHost(JNIEnv *env) {
     if (g_host) return 1;
-    jclass cls = (*env)->FindClass(env, "info/dynart/soob/Host");
+    jclass cls = (*env)->FindClass(env, "net/dynart/soob/Host");
     if (!cls) { LOGW("Host class not found"); return 0; }
     g_host = (jclass)(*env)->NewGlobalRef(env, cls);
     (*env)->DeleteLocalRef(env, cls);
@@ -723,7 +723,7 @@ static int cacheHost(JNIEnv *env) {
     return 1;
 }
 
-JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_newState(JNIEnv *env, jobject self) {
+JNIEXPORT jboolean JNICALL Java_net_dynart_soob_Lua_newState(JNIEnv *env, jobject self) {
     (void)self;
     g_env = env;
     if (!cacheHost(env)) return JNI_FALSE;
@@ -736,13 +736,13 @@ JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_newState(JNIEnv *env, jobje
     return JNI_TRUE;
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_destroy(JNIEnv *env, jobject self) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_destroy(JNIEnv *env, jobject self) {
     (void)self;
     g_env = env;
     if (gL) { lua_close(gL); gL = 0; }
 }
 
-JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_doAsset(JNIEnv *env, jobject self, jstring jpath) {
+JNIEXPORT jboolean JNICALL Java_net_dynart_soob_Lua_doAsset(JNIEnv *env, jobject self, jstring jpath) {
     (void)self;
     g_env = env;
     lua_State *L = gL;
@@ -759,7 +759,7 @@ JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_doAsset(JNIEnv *env, jobjec
     return JNI_TRUE;
 }
 
-JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_doString(JNIEnv *env, jobject self, jstring jsrc) {
+JNIEXPORT jboolean JNICALL Java_net_dynart_soob_Lua_doString(JNIEnv *env, jobject self, jstring jsrc) {
     (void)self;
     g_env = env;
     lua_State *L = gL;
@@ -774,7 +774,7 @@ JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_doString(JNIEnv *env, jobje
     return JNI_TRUE;
 }
 
-JNIEXPORT jboolean JNICALL Java_info_dynart_soob_Lua_loadAssets(JNIEnv *env, jobject self, jstring jpath) {
+JNIEXPORT jboolean JNICALL Java_net_dynart_soob_Lua_loadAssets(JNIEnv *env, jobject self, jstring jpath) {
     (void)self;
     g_env = env;
     lua_State *L = gL;
@@ -852,7 +852,7 @@ static void endHook(int tb, int nargs) {
     lua_remove(gL, tb);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_callHook0(JNIEnv *env, jobject self, jstring jname) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_callHook0(JNIEnv *env, jobject self, jstring jname) {
     (void)self;
     g_env = env;
     if (!gL) return;
@@ -862,7 +862,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_callHook0(JNIEnv *env, jobject 
     if (tb) endHook(tb, 0);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_update(JNIEnv *env, jobject self, jdouble dt) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_update(JNIEnv *env, jobject self, jdouble dt) {
     (void)self;
     g_env = env;
     if (!gL) return;
@@ -872,7 +872,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_update(JNIEnv *env, jobject sel
     endHook(tb, 1);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_render(JNIEnv *env, jobject self) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_render(JNIEnv *env, jobject self) {
     (void)self;
     g_env = env;
     if (!gL) return;
@@ -881,7 +881,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_render(JNIEnv *env, jobject sel
     endHook(tb, 0);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseDown(JNIEnv *env, jobject self,
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_mouseDown(JNIEnv *env, jobject self,
                                                            jdouble x, jdouble y, jint b) {
     (void)self;
     g_env = env;
@@ -892,7 +892,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseDown(JNIEnv *env, jobject 
     endHook(tb, 3);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseUp(JNIEnv *env, jobject self,
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_mouseUp(JNIEnv *env, jobject self,
                                                          jdouble x, jdouble y, jint b) {
     (void)self;
     g_env = env;
@@ -903,7 +903,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseUp(JNIEnv *env, jobject se
     endHook(tb, 3);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseMove(JNIEnv *env, jobject self,
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_mouseMove(JNIEnv *env, jobject self,
                                                            jdouble x, jdouble y,
                                                            jdouble dx, jdouble dy) {
     (void)self;
@@ -916,7 +916,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_mouseMove(JNIEnv *env, jobject 
     endHook(tb, 4);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_keyDown(JNIEnv *env, jobject self, jstring jname) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_keyDown(JNIEnv *env, jobject self, jstring jname) {
     (void)self;
     g_env = env;
     if (!gL) return;
@@ -927,7 +927,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_keyDown(JNIEnv *env, jobject se
     if (tb) endHook(tb, 1);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_keyUp(JNIEnv *env, jobject self, jstring jname) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_keyUp(JNIEnv *env, jobject self, jstring jname) {
     (void)self;
     g_env = env;
     if (!gL) return;
@@ -938,7 +938,7 @@ JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_keyUp(JNIEnv *env, jobject self
     if (tb) endHook(tb, 1);
 }
 
-JNIEXPORT void JNICALL Java_info_dynart_soob_Lua_textInput(JNIEnv *env, jobject self, jstring jch) {
+JNIEXPORT void JNICALL Java_net_dynart_soob_Lua_textInput(JNIEnv *env, jobject self, jstring jch) {
     (void)self;
     g_env = env;
     if (!gL) return;

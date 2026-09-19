@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- PLACEHOLDER — swap this for your game's art, the Android twin of
+     web/icon.svg. The adaptive-icon background is app.lua's `background`, so
+     only the foreground glyph is drawn here. Keep it inside the middle 72dp of
+     the 108dp canvas; the launcher masks and parallaxes everything outside it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Placeholder: magnifier glyph. Swap for the real Find5 icon at M5. -->
+    <!-- A blank screen with a cursor: this template draws one label and waits. -->
     <path
         android:fillColor="#F2E9DC"
-        android:pathData="M47,26a21,21 0 1,0 0.1,0zM47,34a13,13 0 1,1 -0.1,0z" />
+        android:pathData="M30,36h48a4,4 0 0,1 4,4v28a4,4 0 0,1 -4,4h-48a4,4 0 0,1 -4,-4v-28a4,4 0 0,1 4,-4zM32,42v24h44v-24z" />
     <path
         android:fillColor="#F2E9DC"
-        android:pathData="M60.5,60.5l5.7,-5.7l17,17a4,4 0 0,1 -5.7,5.7z" />
+        android:pathData="M38,48h6v12h-6z" />
 </vector>

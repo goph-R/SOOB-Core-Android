@@ -3,8 +3,16 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// Publishable coordinates. Nothing is published to a repository today, but a
+// composite build substitutes by group:name — a game in its own repo that does
+//     includeBuild '../SOOB-Core-Android'
+// and asks for 'net.dynart.soob:soob-player' only gets this project if these
+// two lines exist. (LisaEngine carries the same pair for CoolFox.)
+group = 'net.dynart.soob'
+version = '0.1.0'
+
 android {
-    namespace 'info.dynart.soob'
+    namespace 'net.dynart.soob'
     compileSdk 36
     ndkVersion '29.0.13846066'
 
