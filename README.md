@@ -136,7 +136,7 @@ cd ../Find5/android
 ./gradlew :app:assembleDebug     # net.dynart.find5; builds :soob-player for you
 ```
 
-[`SOOB-Template`](https://github.com/goph-R/SOOB-Template) carries the same
+[`SOOB-Core-Template`](https://github.com/goph-R/SOOB-Core-Template) carries the same
 module ready-made as its `android/` folder: clone-and-rename gives you an APK,
 and `tools/rename.sh "My Game" mygame com.example.mygame` sets the
 applicationId along with everything else. Copy that folder into an existing

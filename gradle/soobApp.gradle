@@ -24,7 +24,7 @@
 // place. A game living in its own repo and consuming :soob-player through a
 // composite build applies it by path instead:
 //     apply from: file("$rootDir/../../SOOB-Core-Android/gradle/soobApp.gradle")
-// (SOOB-Template's android/ folder is exactly that arrangement.) Everything
+// (SOOB-Core-Template's android/ folder is exactly that arrangement.) Everything
 // below works from either root — the :soob-player dependency and the syncGame
 // apply both detect which build they are in.
 
