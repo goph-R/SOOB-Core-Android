@@ -47,9 +47,11 @@ static const char *g_gameDir = "../../../Find5";
 static struct {
     int regSounds, regMusic, regTextures, regFonts, regRegions;
     int drawRegion, drawText, drawQuad, drawEllipse, drawBg, drawBlur;
+    int drawTexRect;
     int soundPlay, musicPlay, musicStop, imeShow, imeHide, quit, messages;
     int assetReads, assetMisses;
     char lastRegion[128];
+    char lastTexRect[128];
     char lastText[256];
     char *savedOpts;
 } S;
@@ -58,6 +60,7 @@ static struct {
    option-table parsing ported from script.h can be checked exactly. */
 static struct {
     double region[25];
+    double texRect[25];
     double text[8];
     double quad[8];
     double ellipse[12];
@@ -90,7 +93,8 @@ static int findRegion(const char *n) {
  * ------------------------------------------------------------------------- */
 static const char *METHODS[] = {
     "setArgs", "readAsset", "drawRegion", "drawText", "drawQuad", "drawEllipse",
-    "drawBg", "drawBlur", "viewW", "viewH", "regionW", "regionH", "regionSlice",
+    "drawBg", "drawBlur", "drawTexRect", "viewW", "viewH",
+    "regionW", "regionH", "regionSlice", "textureW", "textureH",
     "textWidth", "keyDown", "mouseX", "mouseY", "mouseBtn", "keyMods",
     "soundPlay", "musicPlay", "musicStop", "musicVolume", "showMessage",
     "requestQuit", "imeShow", "imeHide", "optSave", "optLoad",
@@ -205,6 +209,13 @@ static void hostVoid(jmethodID m, va_list ap) {
         if (findRegion(cstr(n)) < 0) {
             fprintf(stderr, "  ! drawRegion of unregistered region '%s'\n", cstr(n));
         }
+    } else if (is(m, "drawTexRect")) {
+        jstring n = va_arg(ap, jstring);
+        S.drawTexRect++;
+        snprintf(S.lastTexRect, sizeof S.lastTexRect, "%s", cstr(n));
+        memcpy(C.texRect, g_args, sizeof C.texRect);
+        /* No region table to check against -- that is the whole point of the
+           binding: the rect is the caller's, not assets.lua's. */
     } else if (is(m, "drawText")) {
         jstring t = va_arg(ap, jstring);
         jstring f = va_arg(ap, jstring);
@@ -297,6 +308,12 @@ static jdouble st_CallStaticDoubleMethod(JNIEnv *env, jclass c, jmethodID m, ...
         out = 640;
     } else if (is(m, "viewH")) {
         out = 480;
+    } else if (is(m, "textureW") || is(m, "textureH")) {
+        /* A stand-in sheet size: the real host asks the loaded bitmap. Fixed
+           here so the Lua can do grid arithmetic and the harness can assert
+           on it. -1 for an unknown name, matching regionW/H. */
+        jstring n = va_arg(ap, jstring);
+        out = (cstr(n) && *cstr(n)) ? (is(m, "textureW") ? 256 : 128) : -1;
     } else if (is(m, "regionW") || is(m, "regionH")) {
         jstring n = va_arg(ap, jstring);
         int i = findRegion(cstr(n));
@@ -440,6 +457,12 @@ static void checkBindingMarshalling(JNIEnv *env) {
         "  drawEllipse(5, 6, 7, 8, { start = 0.25, finish = 0.75, segments = 32,\n"
         "      thickness = 2.5, color = { 0, 1, 0 }, alpha = 0.5 })\n"
         "  drawBlur('image_1a', { width = 32, alpha = 0.3 })\n"
+        /* drawTexRect takes the same options as drawRegion but names a
+           TEXTURE, and textureSize feeds the grid arithmetic a game does to
+           work the rects out. */
+        "  local tw, th = textureSize('image_1a')\n"
+        "  drawTexRect('image_1a', 7, 9, { srcX = tw / 4, srcY = th / 2,\n"
+        "      srcW = tw / 4, srcH = th / 2, dstW = 64, dstH = 48 })\n"
         "  imeShow(11, 22, 33, 44)\n"
         "end\n"));
     Java_net_dynart_soob_Lua_render(env, 0);
@@ -454,6 +477,20 @@ static void checkBindingMarshalling(JNIEnv *env) {
     checkNum(C.region[8], 1.5, "drawRegion rotation");
     checkNum(C.region[9], 0.1, "drawRegion color r");
     checkNum(C.region[12], 0.4, "drawRegion color a");
+    /* drawTexRect: same 25-slot layout, and the srcX/srcY it was given are
+       the ones textureSize made possible (256 x 128 from the stub host). */
+    checkNum(C.texRect[0], 7, "drawTexRect x");
+    checkNum(C.texRect[1], 9, "drawTexRect y");
+    checkNum(C.texRect[13], 1, "drawTexRect hasSrcX");
+    checkNum(C.texRect[14], 64, "drawTexRect srcX (textureSize w / 4)");
+    checkNum(C.texRect[16], 64, "drawTexRect srcY (textureSize h / 2)");
+    checkNum(C.texRect[18], 64, "drawTexRect srcW");
+    checkNum(C.texRect[20], 64, "drawTexRect srcH");
+    checkNum(C.texRect[21], 1, "drawTexRect hasDstW");
+    checkNum(C.texRect[22], 64, "drawTexRect dstW");
+    checkNum(C.texRect[24], 48, "drawTexRect dstH");
+    checkNum(S.drawTexRect, 1, "drawTexRect called once");
+
     checkNum(C.region[13], 1, "drawRegion hasSrcX");
     checkNum(C.region[14], 8, "drawRegion srcX");
     checkNum(C.region[15], 0, "drawRegion hasSrcY (absent)");

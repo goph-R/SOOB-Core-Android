@@ -53,7 +53,9 @@ static jclass g_host = 0;   /* global ref to net.dynart.soob.Host */
 static struct {
     jmethodID setArgs, readAsset, log;
     jmethodID drawRegion, drawText, drawQuad, drawEllipse, drawBg, drawBlur;
+    jmethodID drawTexRect;
     jmethodID viewW, viewH, regionW, regionH, regionSlice, textWidth;
+    jmethodID textureW, textureH;
     jmethodID keyDown, mouseX, mouseY, mouseBtn, keyMods;
     jmethodID soundPlay, musicPlay, musicStop, musicVolume;
     jmethodID showMessage, requestQuit, imeShow, imeHide;
@@ -83,6 +85,12 @@ static void h_drawRegion(const char *name, double *a) {
     jstring n = jstr(name);
     HOST_V(drawRegion, n);
     jfree(n);
+}
+static void h_drawTexRect(const char *tex, double *a) {
+    (void)a;                              /* the host reads g_args directly */
+    jstring t = jstr(tex);
+    HOST_V(drawTexRect, t);
+    jfree(t);
 }
 static void h_drawText(const char *text, const char *font, double *a) {
     (void)a;
@@ -114,6 +122,18 @@ static double h_regionW(const char *n) {
 static double h_regionH(const char *n) {
     jstring s = jstr(n);
     double v = HOST_D(regionH, s);
+    jfree(s);
+    return v;
+}
+static double h_textureW(const char *n) {
+    jstring s = jstr(n);
+    double v = HOST_D(textureW, s);
+    jfree(s);
+    return v;
+}
+static double h_textureH(const char *n) {
+    jstring s = jstr(n);
+    double v = HOST_D(textureH, s);
     jfree(s);
     return v;
 }
@@ -265,8 +285,10 @@ static void optColor(lua_State *L, int idx, double *r, double *g, double *b, dou
 }
 
 /* ---- rendering bindings ---- */
-static int scrDrawRegion(lua_State *L) {
-    const char *name = luaL_checkstring(L, 1);
+/* Read a draw call's (x, y [, opts]) into g_args, in the layout every
+   host expects. Shared by drawRegion and drawTexRect, which differ only
+   in what argument 1 names. */
+static void readDrawArgs(lua_State *L) {
     double x = luaL_checknumber(L, 2), y = luaL_checknumber(L, 3);
     double align = 0, flip = 0, fillX = 1, fillY = 1, sx = 1, sy = 1, rot = 0;
     double r = 1, g = 1, b = 1, a = 1;
@@ -302,7 +324,23 @@ static int scrDrawRegion(lua_State *L) {
     A[13] = hsx; A[14] = srcX; A[15] = hsy; A[16] = srcY;
     A[17] = hsw; A[18] = srcW; A[19] = hsh; A[20] = srcH;
     A[21] = hdw; A[22] = dstW; A[23] = hdh; A[24] = dstH;
+}
+
+static int scrDrawRegion(lua_State *L) {
+    const char *name = luaL_checkstring(L, 1);
+    readDrawArgs(L);
     h_drawRegion(name, g_args);
+    return 0;
+}
+
+/* drawTexRect(tex, x, y [, opts]) -- drawRegion with the source rect given
+   per call instead of registered. Identical arguments; the host decides what
+   to do with them, so the only difference down here is which Host method is
+   called. See SOOB-Lua.md. */
+static int scrDrawTexRect(lua_State *L) {
+    const char *tex = luaL_checkstring(L, 1);
+    readDrawArgs(L);
+    h_drawTexRect(tex, g_args);
     return 0;
 }
 
@@ -376,6 +414,16 @@ static int scrRegionSize(lua_State *L) {
     if (w < 0) return 0;
     lua_pushinteger(L, (int)w);
     lua_pushinteger(L, (int)h_regionH(n));
+    return 2;
+}
+/* textureSize(tex) -> w, h. Nothing when the texture is unknown, so a
+   script can test it with `if not w then`. */
+static int scrTextureSize(lua_State *L) {
+    const char *n = luaL_checkstring(L, 1);
+    double w = h_textureW(n);
+    if (w < 0) return 0;
+    lua_pushinteger(L, (int)w);
+    lua_pushinteger(L, (int)h_textureH(n));
     return 2;
 }
 static int scrRegionSlice(lua_State *L) {
@@ -596,6 +644,8 @@ static void registerAll(lua_State *L) {
     lua_register(L, "viewSize", scrViewSize);
     lua_register(L, "regionSlice", scrRegionSlice);
     lua_register(L, "regionSize", scrRegionSize);
+    lua_register(L, "drawTexRect", scrDrawTexRect);
+    lua_register(L, "textureSize", scrTextureSize);
     lua_register(L, "optSet", scrOptSet);
     lua_register(L, "optGet", scrOptGet);
     lua_register(L, "optSave", scrOptSave);
@@ -688,10 +738,13 @@ static int cacheHost(JNIEnv *env) {
     MID(drawEllipse, "()V")
     MID(drawBg,    "(Ljava/lang/String;)V")
     MID(drawBlur,  "(Ljava/lang/String;DD)V")
+    MID(drawTexRect, "(Ljava/lang/String;)V")
     MID(viewW,     "()D")
     MID(viewH,     "()D")
     MID(regionW,   "(Ljava/lang/String;)D")
     MID(regionH,   "(Ljava/lang/String;)D")
+    MID(textureW,  "(Ljava/lang/String;)D")
+    MID(textureH,  "(Ljava/lang/String;)D")
     MID(regionSlice, "(Ljava/lang/String;)Z")
     MID(textWidth, "(Ljava/lang/String;Ljava/lang/String;D)D")
     MID(keyDown,   "(Ljava/lang/String;)Z")

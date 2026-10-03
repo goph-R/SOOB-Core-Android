@@ -56,10 +56,32 @@ object Host {
             Log.w(TAG, "drawRegion: unknown region $name")
             return
         }
-        val te = Assets.getTexture(rg.tex)
+        drawTexBase(rg.tex, rg.x, rg.y, rg.w, rg.h)
+    }
+
+    /**
+     * drawTexRect(tex, x, y [, opts]) — the same drawing with the source rect
+     * supplied per call instead of registered in assets.lua, for rects that
+     * are a calculation: sprite frames from an index, or an image cut into a
+     * grid the player picks. A base of zero size means the whole texture, so
+     * the caller's srcX / srcY are plain texture pixels.
+     */
+    @JvmStatic
+    fun drawTexRect(tex: String) {
+        drawTexBase(tex, 0f, 0f, 0f, 0f)
+    }
+
+    /** Shared by [drawRegion] and [drawTexRect]; geometry ported from
+     *  `script.h`'s scrDrawTexSub. */
+    private fun drawTexBase(texName: String, bx0: Float, by0: Float, bw0: Float, bh0: Float) {
+        val te = Assets.getTexture(texName)
         if (te == null || te.tex == 0 || te.w <= 0) return
         val tw = te.w.toFloat()
         val th = te.h.toFloat()
+        val bx = if (bw0 > 0f && bh0 > 0f) bx0 else 0f
+        val by = if (bw0 > 0f && bh0 > 0f) by0 else 0f
+        val bw = if (bw0 > 0f) bw0 else tw
+        val bh = if (bh0 > 0f) bh0 else th
 
         val x = f(0)
         val y = f(1)
@@ -90,10 +112,10 @@ object Host {
         fx = fx.coerceIn(0f, 1f)
         fy = fy.coerceIn(0f, 1f)
 
-        val effSx = rg.x + (if (hasSrcX) srcX else 0f)
-        val effSy = rg.y + (if (hasSrcY) srcY else 0f)
-        val effSw = if (hasSrcW) srcW else rg.w
-        val effSh = if (hasSrcH) srcH else rg.h
+        val effSx = bx + (if (hasSrcX) srcX else 0f)
+        val effSy = by + (if (hasSrcY) srcY else 0f)
+        val effSw = if (hasSrcW) srcW else bw
+        val effSh = if (hasSrcH) srcH else bh
 
         var alignH = align and 7
         var alignV = align and 56
@@ -205,6 +227,12 @@ object Host {
 
     @JvmStatic
     fun viewH(): Double = Renderer.viewH().toDouble()
+
+    @JvmStatic
+    fun textureW(name: String): Double = Assets.textureW(name)
+
+    @JvmStatic
+    fun textureH(name: String): Double = Assets.textureH(name)
 
     @JvmStatic
     fun regionW(name: String): Double = Assets.regionW(name)

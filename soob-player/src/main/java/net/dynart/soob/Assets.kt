@@ -211,6 +211,17 @@ object Assets {
         return defaultFont?.let { fonts[it] }
     }
 
+    /** Pixel size of a loaded texture, or -1 if unknown or not loaded yet. */
+    fun textureW(name: String): Double {
+        val t = textures[name] ?: return -1.0
+        return if (t.w > 0) t.w.toDouble() else -1.0
+    }
+
+    fun textureH(name: String): Double {
+        val t = textures[name] ?: return -1.0
+        return if (t.h > 0) t.h.toDouble() else -1.0
+    }
+
     fun regionW(name: String): Double = regions[name]?.w?.toDouble() ?: -1.0
 
     fun regionH(name: String): Double = regions[name]?.h?.toDouble() ?: -1.0
